@@ -223,6 +223,9 @@ public static class SelfTest
         enc.Frames.Add(BitmapFrame.Create(rtb));
         using var f = File.Create(outPng);
         enc.Save(f);
+        var named = w.Ring.Children.OfType<UIElement>().Where(e => e is not System.Windows.Controls.TextBlock)
+            .Select(e => System.Windows.Automation.Peers.UIElementAutomationPeer.CreatePeerForElement(e)?.GetName()).ToList();
+        Check("every wheel wedge is visible to screen readers with a name", named.Count > 0 && named.All(n => !string.IsNullOrEmpty(n)), string.Join(" | ", named));
         w.Close();
     }
 

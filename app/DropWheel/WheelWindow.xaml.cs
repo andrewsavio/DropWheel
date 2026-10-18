@@ -17,6 +17,14 @@ namespace DropWheel;
 /// or in the middle of the screen from the keyboard hotkey (takes focus, arrows + Enter).
 /// Each slot is a drop target; more than 12 options collapse into groups that open on a short hover.
 /// </summary>
+/// <summary>A wedge that screen readers and UI Automation can see (a plain Shape has no automation peer).</summary>
+sealed class Wedge : System.Windows.Shapes.Shape
+{
+    public Geometry? Data { get; init; }
+    protected override Geometry DefiningGeometry => Data ?? Geometry.Empty;
+    protected override System.Windows.Automation.Peers.AutomationPeer OnCreateAutomationPeer() => new System.Windows.Automation.Peers.FrameworkElementAutomationPeer(this);
+}
+
 public partial class WheelWindow : Window
 {
     const double Size = 420, Outer = 176, Inner = 66;
@@ -151,7 +159,7 @@ public partial class WheelWindow : Window
     }
 
     /// <summary>One pie wedge of the ring, centred on angle mid with half-width half. Its label sits on top and ignores the mouse, so the wedge is the drop target.</summary>
-    System.Windows.Shapes.Path MakeSlot(string label, string tip, Action<IReadOnlyList<string>> run, bool isGroup, double mid, double half)
+    Wedge MakeSlot(string label, string tip, Action<IReadOnlyList<string>> run, bool isGroup, double mid, double half)
     {
         double c = Ring.Width / 2, gap = 0.02; // radians of empty space between wedges
         double w = Math.Max(0.05, half - gap);
@@ -166,7 +174,7 @@ public partial class WheelWindow : Window
             ctx.ArcTo(P(Inner, mid - w), new Size(Inner, Inner), 0, big, SweepDirection.Counterclockwise, true, false);
         }
         g.Freeze();
-        var slot = new System.Windows.Shapes.Path
+        var slot = new Wedge
         {
             Data = g, StrokeThickness = 0, Fill = Res("OverlaySurface"), Stroke = Res("OverlayBorder"), StrokeLineJoin = PenLineJoin.Round,
             AllowDrop = true, Focusable = true, ToolTip = tip, FocusVisualStyle = null, Cursor = Cursors.Hand,

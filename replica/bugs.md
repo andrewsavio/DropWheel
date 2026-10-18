@@ -15,6 +15,8 @@ Only things reproduced. Severity: S1 data loss, security, legal or core flow blo
 
 Test-script mistakes, not app bugs, found along the way: `SetCursorPos` does not reach mouse hooks (use `mouse_event`); `Move` is an alias of `Move-Item`; `SetFocus` selects an Explorer item; Explorer reuses an open window and its old selection.
 
+| B10 | S3 | New pie wedges were invisible to screen readers and UI Automation | wedges were plain Shapes, which have no automation peer, so Narrator and the e2e scripts could not see them | `Wedge` shape with an automation peer; self-test checks every wedge has a name (found while re-testing after the wheel redesign) |
+
 ## Open
 
 None at S1 or S2.
@@ -30,3 +32,5 @@ None at S1 or S2.
 - Whether Alt as the Actions key shows the Windows menu bar in some apps.
 - The 20-file counter counts per input file, but a batch Zip of 5 files counts 5. Decide if that is what you want.
 - Engine paths (ffmpeg, ImageMagick, pandoc, LibreOffice, Poppler, Ghostscript) are written but have never run.
+
+- Live drag e2e (`e2e/drag.ps1`) was not re-run on the pie wheel: the run failed because a full-screen browser was in front of Explorer, so no wheel could be dragged over. Not a product result. Run it with the desktop clear, using the Release exe: `pwsh e2e/drag.ps1 -Exe <Release exe> -Slots 8`. Note the script defaults to the Debug path.
