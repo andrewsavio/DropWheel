@@ -40,3 +40,6 @@ Still not run: pandoc, LibreOffice, Poppler, Ghostscript paths.
 S01 now a ring of 8 pie wedges with gaps, labels only, centre shows thumbnail (or file icon) and size, light translucent warm palette (own colours). More than 8 options collapse into groups. Screenshot: clone-screens/S01.png. Not yet seen live over Explorer.
 
 Wheel colours matched to the one reference image (sampled): wedges are white at about 55% over whatever is behind, thin gaps, no outlines, dark-brown medium labels, hover goes to near-opaque white, centre is a translucent disc with thumbnail beside the size. Personal use, so the look follows the reference closely; no original assets or copy are used.
+
+## Frosted glass ring (2026-10-18)
+Built from the approved mockup: wedges inset and drawn with a 10 px round-joined white rim (rounded corners), top-to-bottom white glass gradient, near-opaque hover, soft shadow under the ring, white labels with a faint halo, glass centre with thumbnail, size and file name. No real backdrop blur: Acrylic/Mica does not work on an AllowsTransparency window, so the glass is translucent, not blurred. Self-test screenshot now renders on a colourful gradient.

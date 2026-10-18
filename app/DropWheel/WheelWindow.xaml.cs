@@ -27,7 +27,9 @@ sealed class Wedge : System.Windows.Shapes.Shape
 
 public partial class WheelWindow : Window
 {
-    const double Size = 420, Outer = 176, Inner = 66;
+    const double Size = 420, Outer = 176, Inner = 74;
+    static readonly System.Windows.Media.Effects.DropShadowEffect Halo = MakeHalo(); // keeps white labels readable on light backdrops
+    static System.Windows.Media.Effects.DropShadowEffect MakeHalo() { var e = new System.Windows.Media.Effects.DropShadowEffect { Color = Color.FromRgb(0x5a, 0x1e, 0x3c), BlurRadius = 4, ShadowDepth = 0, Opacity = 0.5 }; e.Freeze(); return e; }
     const int MaxSlots = 8; // a ring of 8 wedges reads at a glance; more collapse into groups
 
     readonly IReadOnlyList<string> _paths;
@@ -93,7 +95,7 @@ public partial class WheelWindow : Window
         Ring.Children.Clear();
         var ops = Registry.For(_paths, KindOf(_mode));
         SetCentre();
-        HoleSub.Text = _group ?? (_mode == Mode.Convert ? "" : _mode.ToString());
+        HoleSub.Text = _group ?? (_mode != Mode.Convert ? _mode.ToString() : _paths.Count == 1 ? Path.GetFileName(_paths[0].TrimEnd('\\', '/')) : "");
         HoleSub.Visibility = HoleSub.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
 
         var entries = new List<(string label, string tip, Action<IReadOnlyList<string>> run, bool isGroup)>();
@@ -161,39 +163,44 @@ public partial class WheelWindow : Window
     /// <summary>One pie wedge of the ring, centred on angle mid with half-width half. Its label sits on top and ignores the mouse, so the wedge is the drop target.</summary>
     Wedge MakeSlot(string label, string tip, Action<IReadOnlyList<string>> run, bool isGroup, double mid, double half)
     {
-        double c = Ring.Width / 2, gap = 0.02; // radians of empty space between wedges
-        double w = Math.Max(0.05, half - gap);
+        // Each wedge is inset by half the rim width and drawn with a round-joined rim, which gives the rounded corners.
+        const double Pad = 7, Rim = 10;
+        double c = Ring.Width / 2, ro = Outer - Pad - Rim / 2, ri = Inner + Pad + Rim / 2;
+        double wo = Math.Max(0.05, half - (0.045 + Rim / 2 / ro)), wi = Math.Max(0.05, half - (0.045 + Rim / 2 / ri));
         Point P(double r, double a) => new(c + r * Math.Cos(a), c + r * Math.Sin(a));
         var g = new StreamGeometry();
         using (var ctx = g.Open())
         {
-            bool big = w * 2 > Math.PI;
-            ctx.BeginFigure(P(Outer, mid - w), true, true);
-            ctx.ArcTo(P(Outer, mid + w), new Size(Outer, Outer), 0, big, SweepDirection.Clockwise, true, false);
-            ctx.LineTo(P(Inner, mid + w), true, false);
-            ctx.ArcTo(P(Inner, mid - w), new Size(Inner, Inner), 0, big, SweepDirection.Counterclockwise, true, false);
+            bool big = wo * 2 > Math.PI;
+            ctx.BeginFigure(P(ro, mid - wo), true, true);
+            ctx.ArcTo(P(ro, mid + wo), new Size(ro, ro), 0, big, SweepDirection.Clockwise, true, false);
+            ctx.LineTo(P(ri, mid + wi), true, false);
+            ctx.ArcTo(P(ri, mid - wi), new Size(ri, ri), 0, big, SweepDirection.Counterclockwise, true, false);
         }
         g.Freeze();
         var slot = new Wedge
         {
-            Data = g, StrokeThickness = 0, Fill = Res("OverlaySurface"), Stroke = Res("OverlayBorder"), StrokeLineJoin = PenLineJoin.Round,
+            Data = g, StrokeThickness = Rim, Fill = Res("OverlayGlass"), Stroke = Res("OverlayRim"), StrokeLineJoin = PenLineJoin.Round,
             AllowDrop = true, Focusable = true, ToolTip = tip, FocusVisualStyle = null, Cursor = Cursors.Hand,
         };
         Ring.Children.Add(slot); // before the label, so the label draws on top
         var text = new TextBlock
         {
-            Text = label, FontWeight = FontWeights.Medium, FontSize = 13, TextAlignment = TextAlignment.Center, IsHitTestVisible = false,
+            Text = label, FontWeight = FontWeights.Medium, FontSize = 14, TextAlignment = TextAlignment.Center, IsHitTestVisible = false,
             Width = 90, Foreground = Res("OverlayText"),
         };
         text.Measure(new Size(90, 40));
-        var lp = P((Outer + Inner) / 2, mid);
+        var lp = P((ro + ri) / 2 + 2, mid);
         Canvas.SetLeft(text, lp.X - 45); Canvas.SetTop(text, lp.Y - text.DesiredSize.Height / 2);
+        text.Effect = Halo;
         Ring.Children.Add(text);
         System.Windows.Automation.AutomationProperties.SetName(slot, tip.Length > 0 ? $"{label}: {tip}" : label);
         void Hover(bool on)
         {
-            slot.Fill = Res(on ? "OverlayAccent" : "OverlaySurface");
+            slot.Fill = Res(on ? "OverlayGlassHot" : "OverlayGlass");
+            slot.Stroke = Res(on ? "OverlayRimHot" : "OverlayRim");
             text.Foreground = Res(on ? "OnOverlayAccent" : "OverlayText");
+            text.Effect = on ? null : Halo;
         }
         slot.MouseEnter += (_, _) => Hover(true);
         slot.MouseLeave += (_, _) => { if (!slot.IsKeyboardFocused) Hover(false); };

@@ -30,13 +30,13 @@
   <SolidColorBrush x:Key="OverlaySurface" Color="{StaticResource OverlaySurfaceColor}"/>
   <Color x:Key="OverlayBorderColor">#00ffffff</Color>
   <SolidColorBrush x:Key="OverlayBorder" Color="{StaticResource OverlayBorderColor}"/>
-  <Color x:Key="OverlayTextColor">#4a2a18</Color>
+  <Color x:Key="OverlayTextColor">#ffffffff</Color>
   <SolidColorBrush x:Key="OverlayText" Color="{StaticResource OverlayTextColor}"/>
-  <Color x:Key="OverlayTextMutedColor">#6b4a3a</Color>
+  <Color x:Key="OverlayTextMutedColor">#ccffffff</Color>
   <SolidColorBrush x:Key="OverlayTextMuted" Color="{StaticResource OverlayTextMutedColor}"/>
   <Color x:Key="OverlayAccentColor">#e8ffffff</Color>
   <SolidColorBrush x:Key="OverlayAccent" Color="{StaticResource OverlayAccentColor}"/>
-  <Color x:Key="OnOverlayAccentColor">#3b1d0c</Color>
+  <Color x:Key="OnOverlayAccentColor">#2b1204</Color>
   <SolidColorBrush x:Key="OnOverlayAccent" Color="{StaticResource OnOverlayAccentColor}"/>
   <CornerRadius x:Key="RadiusSm">6</CornerRadius>
   <CornerRadius x:Key="RadiusMd">10</CornerRadius>
@@ -61,4 +61,12 @@
   <sys:Double x:Key="SlotMin">56</sys:Double>
   <sys:Double x:Key="SettingsWidth">560</sys:Double>
   <sys:Double x:Key="ToastWidth">320</sys:Double>
+  <LinearGradientBrush x:Key="OverlayGlass" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Color="#9effffff" Offset="0"/><GradientStop Color="#57ffffff" Offset="1"/>
+  </LinearGradientBrush>
+  <LinearGradientBrush x:Key="OverlayGlassHot" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Color="#f2ffffff" Offset="0"/><GradientStop Color="#b8ffffff" Offset="1"/>
+  </LinearGradientBrush>
+  <SolidColorBrush x:Key="OverlayRim" Color="#8cffffff"/>
+  <SolidColorBrush x:Key="OverlayRimHot" Color="#e6ffffff"/>
 </ResourceDictionary>

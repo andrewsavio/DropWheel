@@ -6,20 +6,19 @@
         FontFamily="{StaticResource FontSans}" FontSize="{StaticResource TextXs}">
   <Grid x:Name="Root" RenderTransformOrigin="0.5,0.5">
     <Grid.RenderTransform><ScaleTransform x:Name="Scale" ScaleX="1" ScaleY="1"/></Grid.RenderTransform>
-    <Ellipse Width="352" Height="352" Fill="{StaticResource OverlayBg}">
-      <Ellipse.Effect><DropShadowEffect BlurRadius="30" ShadowDepth="6" Opacity="0.12"/></Ellipse.Effect>
-    </Ellipse>
     <Canvas x:Name="Ring" Width="{StaticResource WheelDiameter}" Height="{StaticResource WheelDiameter}"
-            KeyboardNavigation.DirectionalNavigation="Cycle" KeyboardNavigation.TabNavigation="Cycle"/>
+            KeyboardNavigation.DirectionalNavigation="Cycle" KeyboardNavigation.TabNavigation="Cycle">
+      <Canvas.Effect><DropShadowEffect Color="#3a1030" BlurRadius="32" ShadowDepth="14" Direction="270" Opacity="0.35"/></Canvas.Effect>
+    </Canvas>
     <Border x:Name="Hole" Width="{StaticResource WheelHole}" Height="{StaticResource WheelHole}" CornerRadius="56"
-            Background="{StaticResource OverlaySurface}" AllowDrop="True" Focusable="True"
+            Background="{StaticResource OverlayGlass}" BorderBrush="{StaticResource OverlayRim}" BorderThickness="1.5" AllowDrop="True" Focusable="True"
             AutomationProperties.Name="Centre">
       <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="4">
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
           <Image x:Name="HoleImage" Width="34" Height="34" Margin="0,0,6,0" RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="File preview"/>
-          <TextBlock x:Name="HoleTitle" Foreground="{StaticResource OverlayText}" VerticalAlignment="Center" TextAlignment="Center" FontWeight="Medium" FontSize="13"/>
+          <TextBlock x:Name="HoleTitle" Foreground="{StaticResource OnOverlayAccent}" VerticalAlignment="Center" TextAlignment="Center" FontWeight="Medium" FontSize="13"/>
         </StackPanel>
-        <TextBlock x:Name="HoleSub" Foreground="{StaticResource OverlayTextMuted}" TextAlignment="Center" TextTrimming="CharacterEllipsis"/>
+        <TextBlock x:Name="HoleSub" Foreground="{StaticResource OnOverlayAccent}" TextAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="96" Margin="0,2,0,0"/>
       </StackPanel>
     </Border>
     <TextBlock x:Name="Hint" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,2"

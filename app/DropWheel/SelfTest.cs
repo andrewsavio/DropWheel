@@ -216,7 +216,7 @@ public static class SelfTest
         w.UpdateLayout();
         var rtb = new RenderTargetBitmap(420, 420, 96, 96, PixelFormats.Pbgra32);
         var bg = new DrawingVisual();
-        using (var dc = bg.RenderOpen()) dc.DrawRectangle(new SolidColorBrush(Color.FromRgb(0x6b, 0x72, 0x80)), null, new Rect(0, 0, 420, 420));
+        using (var dc = bg.RenderOpen()) dc.DrawRectangle(new LinearGradientBrush(new GradientStopCollection { new(Color.FromRgb(0xff, 0x8a, 0x3d), 0), new(Color.FromRgb(0xff, 0x6f, 0x91), 0.55), new(Color.FromRgb(0x7b, 0x6c, 0xf0), 1) }, new Point(0, 0), new Point(1, 1)), null, new Rect(0, 0, 420, 420));
         rtb.Render(bg);
         rtb.Render(w.Root);
         var enc = new PngBitmapEncoder();
