@@ -16,7 +16,7 @@ Edit or strip metadata,tools,could,yes,partial,strip for images and PDF tested; 
 Merge / split PDF,tools,could,yes,yes,"PdfPig (Apache-2.0), tested"
 Read QR,tools,could,yes,no,not built
 Actions wheel (Copy Move Copy Path Terminal),actions,could,yes,yes,plus Show in folder; dialogs and terminal untested by hand
-AirDrop,actions,skip,yes,no,no Windows equivalent; Share/Nearby Share needs a packaged helper
+AirDrop,actions,could,yes,skip,no Windows equivalent; Share/Nearby Share needs a packaged helper
 Float file,actions,could,yes,partial,"built, not seen on screen yet"
 Keyboard menu (Enter/arrows/Esc),core,should,yes,partial,"Ctrl+Alt+T, Enter, Esc, empty selection tested with real keys; arrows and 1/2/3 not scripted"
 Batch multiple files,core,should,yes,partial,same-type batches only; mixed types show no options
@@ -24,4 +24,4 @@ Menu bar app,core,should,yes,yes,"tray icon, pause, settings, quit"
 Rebindable modifiers (Settings),core,should,yes,yes,"Shift/Ctrl/Alt per mode, conflicts swap"
 Touch drag/hold,core,could,yes,no,not built or tested
 Local-only processing,privacy,must,yes,yes,no network code
-Free 20 files then paid unlock,business,skip,yes,partial,"counter, limit and paywall event tested; no license server, release builds accept no key"
+Free 20 files then paid unlock,business,could,yes,skip,"own pricing decision; counter + paywall built and tested, no license vendor yet"
