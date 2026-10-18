@@ -30,7 +30,7 @@
   <SolidColorBrush x:Key="OverlaySurface" Color="{StaticResource OverlaySurfaceColor}"/>
   <Color x:Key="OverlayBorderColor">#00ffffff</Color>
   <SolidColorBrush x:Key="OverlayBorder" Color="{StaticResource OverlayBorderColor}"/>
-  <Color x:Key="OverlayTextColor">#ffffffff</Color>
+  <Color x:Key="OverlayTextColor">#2b1204</Color>
   <SolidColorBrush x:Key="OverlayText" Color="{StaticResource OverlayTextColor}"/>
   <Color x:Key="OverlayTextMutedColor">#ccffffff</Color>
   <SolidColorBrush x:Key="OverlayTextMuted" Color="{StaticResource OverlayTextMutedColor}"/>

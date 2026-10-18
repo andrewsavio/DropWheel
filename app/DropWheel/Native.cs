@@ -8,13 +8,14 @@ namespace DropWheel;
 public struct POINT { public int X, Y; }
 
 [StructLayout(LayoutKind.Sequential)]
+public struct KBDLLHOOKSTRUCT { public uint vkCode, scanCode, flags, time; public IntPtr extra; }
 public struct MSLLHOOKSTRUCT { public POINT pt; public uint mouseData, flags, time; public IntPtr extra; }
 
 public static class Native
 {
     public delegate IntPtr HookProc(int code, IntPtr wParam, IntPtr lParam);
 
-    public const int WH_MOUSE_LL = 14;
+    public const int WH_MOUSE_LL = 14, WH_KEYBOARD_LL = 13;
     public const int WM_MOUSEMOVE = 0x200, WM_LBUTTONDOWN = 0x201, WM_LBUTTONUP = 0x202, WM_HOTKEY = 0x312;
     public const int GWL_EXSTYLE = -20;
     public const int WS_EX_NOACTIVATE = 0x08000000, WS_EX_TOOLWINDOW = 0x80;

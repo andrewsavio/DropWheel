@@ -28,8 +28,6 @@ sealed class Wedge : System.Windows.Shapes.Shape
 public partial class WheelWindow : Window
 {
     const double Size = 420, Outer = 176, Inner = 74;
-    static readonly System.Windows.Media.Effects.DropShadowEffect Halo = MakeHalo(); // keeps white labels readable on light backdrops
-    static System.Windows.Media.Effects.DropShadowEffect MakeHalo() { var e = new System.Windows.Media.Effects.DropShadowEffect { Color = Color.FromRgb(0x5a, 0x1e, 0x3c), BlurRadius = 4, ShadowDepth = 0, Opacity = 0.5 }; e.Freeze(); return e; }
     const int MaxSlots = 8; // a ring of 8 wedges reads at a glance; more collapse into groups
 
     readonly IReadOnlyList<string> _paths;
@@ -192,7 +190,6 @@ public partial class WheelWindow : Window
         text.Measure(new Size(90, 40));
         var lp = P((ro + ri) / 2 + 2, mid);
         Canvas.SetLeft(text, lp.X - 45); Canvas.SetTop(text, lp.Y - text.DesiredSize.Height / 2);
-        text.Effect = Halo;
         Ring.Children.Add(text);
         System.Windows.Automation.AutomationProperties.SetName(slot, tip.Length > 0 ? $"{label}: {tip}" : label);
         void Hover(bool on)
@@ -200,7 +197,6 @@ public partial class WheelWindow : Window
             slot.Fill = Res(on ? "OverlayGlassHot" : "OverlayGlass");
             slot.Stroke = Res(on ? "OverlayRimHot" : "OverlayRim");
             text.Foreground = Res(on ? "OnOverlayAccent" : "OverlayText");
-            text.Effect = on ? null : Halo;
         }
         slot.MouseEnter += (_, _) => Hover(true);
         slot.MouseLeave += (_, _) => { if (!slot.IsKeyboardFocused) Hover(false); };

@@ -17,6 +17,9 @@ Test-script mistakes, not app bugs, found along the way: `SetCursorPos` does not
 
 | B10 | S3 | New pie wedges were invisible to screen readers and UI Automation | wedges were plain Shapes, which have no automation peer, so Narrator and the e2e scripts could not see them | `Wedge` shape with an automation peer; self-test checks every wedge has a name (found while re-testing after the wheel redesign) |
 
+| B11 | S2 | Shift pressed mid-drag did nothing unless the mouse moved again | user trace: a 2 s drag with Shift never registered (`shift=False` on every move); the trigger was only checked on mouse moves, through GetAsyncKeyState | keyboard hook tracks Shift/Ctrl/Alt and opens the wheel on key-down during a drag; new e2e scenario `still` (key down, no movement) passes, trace shows `trigger Convert (key)` |
+| B12 | S3 | White wheel labels unreadable over dark windows | glass over dark Explorer goes mid-grey; white text about 2.8:1 | labels are dark brown on glass, readable on dark and bright desktops |
+
 ## Open
 
 None at S1 or S2.

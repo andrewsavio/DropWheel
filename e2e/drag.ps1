@@ -1,14 +1,14 @@
 # End-to-end test of the real thing: Shift+drag a file in Explorer, drop it on a wheel slot, check the output.
 # It moves the real mouse for about 15 seconds. Run: pwsh e2e/drag.ps1 [-Slot JPG] [-Key Shift]
 param(
-  [string]$Exe = "$PSScriptRoot\..\app\DropWheel\bin\Debug\net10.0-windows\DropWheel.exe",
+  [string]$Exe = "$PSScriptRoot\..\app\DropWheel\bin\Release\net10.0-windows10.0.19041.0\DropWheel.exe",
   [string]$Out = "$PSScriptRoot\out",
   [string]$Key = "Shift",
   [int]$SlotIndex = 0,        # 0 = top slot of the wheel, clockwise
-  [int]$Slots = 4,            # how many slots this file type shows
+  [int]$Slots = 8,            # how many slots this file type shows
   [string]$Expect = "pic.jpg",
   [string]$ExpectClipboard = "",   # for actions that copy text instead of writing a file
-  [ValidateSet("drop", "nokey", "cancel", "marquee")][string]$Scenario = "drop"
+  [ValidateSet("drop", "nokey", "cancel", "marquee", "still")][string]$Scenario = "drop"
 )
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes, System.Drawing, System.Windows.Forms
@@ -17,6 +17,8 @@ using System; using System.Runtime.InteropServices; using System.Collections.Gen
 public static class W {
   [DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr v);
   [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
   [DllImport("user32.dll")] public static extern void mouse_event(uint f, int dx, int dy, uint d, IntPtr e);
   [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte sc, uint f, IntPtr e);
   [DllImport("user32.dll")] public static extern bool GetCursorPos(out P p);
@@ -80,6 +82,11 @@ Step "app running, pid $($app.Id), dpi scale $scale"
 
 Start-Process explorer.exe $dir
 Start-Sleep 3
+# bring our Explorer window to the front, or a full-screen app on top gets the drag instead
+foreach ($w in @((New-Object -ComObject Shell.Application).Windows())) {
+  try { if ($w.LocationURL -like "*dw-e2e*") { $h = [IntPtr]$w.HWND; [void][W]::ShowWindow($h, 9); [void][W]::SetForegroundWindow($h) } } catch { }
+}
+Start-Sleep -Milliseconds 500
 $cond = New-Object System.Windows.Automation.PropertyCondition ([System.Windows.Automation.AutomationElement]::ControlTypeProperty), ([System.Windows.Automation.ControlType]::ListItem)
 $item = $null
 for ($i = 0; $i -lt 20 -and -not $item; $i++) {
@@ -99,7 +106,8 @@ MoveTo $sx $sy
 Start-Sleep -Milliseconds 150
 for ($i = 1; $i -le 6; $i++) { MoveTo ($sx + 12 * $i) ($sy + 8 * $i) }
 if ($Scenario -ne "nokey") { [W]::keybd_event($vk, 0, 0, [IntPtr]::Zero) }   # trigger key down
-for ($i = 1; $i -le 4; $i++) { MoveTo ($sx + 72 + 6 * $i) ($sy + 48 + 4 * $i) }
+# "still": the key goes down while the mouse is not moving; the wheel must open anyway
+if ($Scenario -ne "still") { for ($i = 1; $i -le 4; $i++) { MoveTo ($sx + 72 + 6 * $i) ($sy + 48 + 4 * $i) } }
 Start-Sleep -Milliseconds 1200
 
 function FindWheel { [W]::WindowsOf($app.Id) | Where-Object { [math]::Abs($_[2] - 420 * $scale) -lt 6 -and [math]::Abs($_[3] - 420 * $scale) -lt 6 } | Select-Object -First 1 }
@@ -127,9 +135,9 @@ if ($off -gt 40) { Fail "wheel is not under the cursor ($([int]$off)px away)" }
 
 if ($Scenario -eq "cancel") { $tx = $cx + 400 * $scale; $ty = $cy }
 else {
-  # slots sit on a ring of radius 134 dip, first one at the top, clockwise
+  # wedge labels sit on a ring of radius about 125 dip, first wedge at the top, clockwise
   $ang = $SlotIndex * 2 * [math]::PI / $Slots - [math]::PI / 2
-  $tx = $cx + [math]::Cos($ang) * 134 * $scale; $ty = $cy + [math]::Sin($ang) * 134 * $scale
+  $tx = $cx + [math]::Cos($ang) * 125 * $scale; $ty = $cy + [math]::Sin($ang) * 125 * $scale
 }
 for ($i = 1; $i -le 12; $i++) { MoveTo ($cur.X + ($tx - $cur.X) * $i / 12) ($cur.Y + ($ty - $cur.Y) * $i / 12) }
 Start-Sleep -Milliseconds 300
