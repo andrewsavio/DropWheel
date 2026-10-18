@@ -18,13 +18,15 @@ public sealed class InputHook : IDisposable
 
     readonly Native.HookProc _proc; // kept in a field so the GC cannot collect the delegate
     IntPtr _hook;
-    bool _down, _moved, _shown;
+    bool _down, _moved, _shown, _announced;
+    int _n;
     POINT _start;
     IntPtr _root;
 
     public Func<Mode, int> KeyFor = _ => 0; // virtual-key per mode, from settings
     public bool Paused;
     public event Action<Mode, POINT, POINT, IntPtr>? Triggered; // mode, start, now, source root window
+    public event Action<POINT, IntPtr>? DragStarted; // a drag began on Explorer or the desktop; no trigger key needed yet
     public event Action? Released;
 
     public InputHook() { _proc = Callback; }
@@ -42,17 +44,21 @@ public sealed class InputHook : IDisposable
             switch ((int)w)
             {
                 case Native.WM_LBUTTONDOWN:
-                    _down = true; _moved = false; _shown = false; _start = ms.pt;
+                    _down = true; _moved = false; _shown = false; _announced = false; _start = ms.pt;
                     _root = Native.GetAncestor(Native.WindowFromPoint(ms.pt), Native.GA_ROOT);
-                    if (Array.IndexOf(ShellClasses, Native.ClassOf(_root)) < 0) _root = IntPtr.Zero;
+                    var cls = Native.ClassOf(_root);
+                    if (Array.IndexOf(ShellClasses, cls) < 0) _root = IntPtr.Zero;
+                    Trace.Log($"down at {ms.pt.X},{ms.pt.Y} root class '{cls}' armed={_root != IntPtr.Zero}");
                     break;
                 case Native.WM_MOUSEMOVE when _down && _root != IntPtr.Zero && !_shown:
                     if (!_moved)
                         _moved = Math.Abs(ms.pt.X - _start.X) > Threshold || Math.Abs(ms.pt.Y - _start.Y) > Threshold;
                     if (_moved)
                     {
+                        if (!_announced) { _announced = true; DragStarted?.Invoke(_start, _root); }
                         var mode = HeldMode();
-                        if (mode != Mode.None) { _shown = true; Triggered?.Invoke(mode, _start, ms.pt, _root); }
+                        if (++_n % 5 == 0) Trace.Log($"move {ms.pt.X},{ms.pt.Y} mode={mode} shift={Native.KeyDown(0x10)} ctrl={Native.KeyDown(0x11)} vk={KeyFor(Mode.Convert)}");
+                        if (mode != Mode.None) { _shown = true; Trace.Log($"trigger {mode}"); Triggered?.Invoke(mode, _start, ms.pt, _root); }
                     }
                     break;
                 case Native.WM_LBUTTONUP when _down:

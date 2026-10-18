@@ -57,3 +57,22 @@ public static class Native
     public static void MakeNoActivate(IntPtr hwnd) =>
         SetWindowLong(hwnd, GWL_EXSTYLE, GetWindowLong(hwnd, GWL_EXSTYLE) | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW);
 }
+
+/// <summary>Set DROPWHEEL_TRACE=1 to append a trace of the drag pipeline to %LOCALAPPDATA%\DropWheel\trace.log.</summary>
+public static class Trace
+{
+    static readonly bool On = Environment.GetEnvironmentVariable("DROPWHEEL_TRACE") == "1";
+    static readonly object Gate = new();
+
+    public static void Log(string message)
+    {
+        if (!On) return;
+        try
+        {
+            var dir = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "DropWheel");
+            System.IO.Directory.CreateDirectory(dir);
+            lock (Gate) System.IO.File.AppendAllText(System.IO.Path.Combine(dir, "trace.log"), $"{DateTime.Now:HH:mm:ss.fff} {message}\n");
+        }
+        catch { }
+    }
+}

@@ -352,13 +352,24 @@ public static class Wic
 {
     public static void Convert(string src, string dst, string outExt, int quality, bool strip = false)
     {
+        var name = Path.GetFileName(src);
         BitmapDecoder dec;
-        try
+        FileStream fs;
+        try { fs = File.OpenRead(src); }
+        catch (FileNotFoundException) { throw new InvalidOperationException($"{name} no longer exists."); }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        { throw new InvalidOperationException($"{name} is open in another program or cannot be read."); }
+        using (fs)
         {
-            using var fs = File.OpenRead(src);
-            dec = BitmapDecoder.Create(fs, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad);
+            try { dec = BitmapDecoder.Create(fs, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad); }
+            catch (Exception)
+            {
+                var ext = Registry.Ext(src);
+                throw new InvalidOperationException(ext is "heic" or "heif" or "webp" or "avif"
+                    ? $"Windows cannot read {ext.ToUpperInvariant()} files yet. Install the {ext.ToUpperInvariant()} Image Extension from the Microsoft Store, or ImageMagick."
+                    : $"{name} is damaged or is not a real {ext.ToUpperInvariant()} image.");
+            }
         }
-        catch (Exception e) { throw new InvalidOperationException($"Windows cannot read this {Registry.Ext(src)} file ({e.Message}). Install the matching Image Extension from the Microsoft Store or ImageMagick."); }
 
         try { Encode(dec, dst, outExt, quality, keepMeta: !strip); }
         catch when (!strip) { Encode(dec, dst, outExt, quality, keepMeta: false); } // metadata that the target format cannot hold

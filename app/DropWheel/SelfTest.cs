@@ -106,10 +106,11 @@ public static class SelfTest
             Check("two pdfs can merge", Registry.For(new[] { p1, p2 }, OpKind.Tool).Any(o => o.Id == "t.pdf.merge"));
             Check("actions work on any selection", Registry.For(new[] { folder }, OpKind.Action).Count >= 5);
 
-            // trial counter
-            Check("fresh install allows 20 files", Db.Allows(20) && !Db.Allows(21));
-            Db.AddUsed(20);
-            Check("21st file blocked", !Db.Allows(1));
+            Check("fresh install allows exactly 20 files", Db.Allows(20) && !Db.Allows(21));
+
+            // ---- edge cases through the real job queue
+            await EdgeCases(dir, png, folder);
+
             Check("bad key rejected", !Db.TryUnlock("nope"));
 
             Log.AppendLine("engines: " + string.Join(", ", new[] { "ffmpeg", "magick", "pandoc", "soffice", "7z", "pdftoppm", "gswin64c" }.Select(e => $"{e}={(Engines.Has(e) ? "yes" : "no")}")));
@@ -171,5 +172,125 @@ public static class SelfTest
         using var f = File.Create(outPng);
         enc.Save(f);
         w.Close();
+    }
+
+    // ------------------------------------------------------------------ edge cases
+
+    static async Task<JobVM> Wait(Func<JobVM?> find, int seconds = 15)
+    {
+        for (int i = 0; i < seconds * 20; i++)
+        {
+            var vm = find();
+            if (vm != null && vm.State is JobState.Done or JobState.Failed or JobState.Cancelled) return vm!;
+            await Task.Delay(50);
+        }
+        throw new TimeoutException("job did not finish");
+    }
+
+    static JobVM Newest() => JobRunner.Jobs.Last();
+
+    static async Task EdgeCases(string dir, string png, string folder)
+    {
+        var jpg = Registry.All().First(o => o.Id == "img>jpg");
+
+        // names: accents, emoji, CJK, spaces
+        var odd = Path.Combine(dir, "café ✓ 写真 (1).png");
+        File.Copy(png, odd);
+        JobRunner.Start(jpg, new[] { odd });
+        var vm = await Wait(Newest);
+        Check("unicode, emoji and spaces in the name", vm.State == JobState.Done && File.Exists(vm.Output), vm.Message);
+
+        // very long name
+        var longName = Path.Combine(dir, new string('x', 180) + ".png");
+        File.Copy(png, longName);
+        JobRunner.Start(jpg, new[] { longName });
+        vm = await Wait(Newest);
+        Check("180-character file name", vm.State == JobState.Done, vm.Message);
+
+        // corrupt input: readable error, no stray output file left behind
+        var bad = Path.Combine(dir, "broken.png");
+        File.WriteAllBytes(bad, new byte[] { 1, 2, 3, 4, 5 });
+        JobRunner.Start(jpg, new[] { bad });
+        vm = await Wait(Newest);
+        Check("corrupt image fails with a message", vm.State == JobState.Failed && vm.Message.Contains("damaged"), vm.Message);
+        Check("failed job leaves no output behind", !File.Exists(Path.Combine(dir, "broken.jpg")));
+
+        // zero-byte input
+        var empty = Path.Combine(dir, "empty.png");
+        File.WriteAllBytes(empty, Array.Empty<byte>());
+        JobRunner.Start(jpg, new[] { empty });
+        vm = await Wait(Newest);
+        Check("zero-byte file fails cleanly", vm.State == JobState.Failed && !File.Exists(Path.Combine(dir, "empty.jpg")), vm.Message);
+
+        // input locked by another program
+        var locked = Path.Combine(dir, "locked.png");
+        File.Copy(png, locked);
+        using (new FileStream(locked, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            JobRunner.Start(jpg, new[] { locked });
+            vm = await Wait(Newest);
+        }
+        Check("locked source fails cleanly, says why", vm.State == JobState.Failed && vm.Message.Contains("open in another program") && !File.Exists(Path.Combine(dir, "locked.jpg")), vm.Message);
+
+        // source disappeared before the job ran
+        JobRunner.Start(jpg, new[] { Path.Combine(dir, "gone.png") });
+        vm = await Wait(Newest);
+        Check("missing source fails cleanly, says why", vm.State == JobState.Failed && vm.Message.Contains("no longer exists"), vm.Message);
+
+        // many jobs at once, same source and target: names must not collide
+        var before = Directory.GetFiles(dir, "pic*.jpg").Length;
+        for (int i = 0; i < 8; i++) JobRunner.Start(jpg, new[] { png });
+        var batch = JobRunner.Jobs.TakeLast(8).ToList();
+        foreach (var j in batch) await Wait(() => j);
+        var outs = batch.Select(j => j.Output).Distinct().Count();
+        Check("8 parallel jobs get 8 different files", batch.All(j => j.State == JobState.Done) && outs == 8, $"{outs} distinct");
+
+        // cancel while running: state is cancelled and the reserved name is removed
+        var slow = new Op("test.slow", OpKind.Convert, "SLOW", "Test", "", _ => true, "out",
+            async (s, d, p, ct) => { await Task.Delay(30000, ct); });
+        JobRunner.Start(slow, new[] { png });
+        var running = Newest();
+        for (int i = 0; i < 100 && running.State != JobState.Running; i++) await Task.Delay(30);
+        Check("job reaches Running", running.State == JobState.Running);
+        var stem = Path.Combine(dir, "pic.out");
+        Check("name is reserved while running", File.Exists(stem));
+        running.Cts.Cancel();
+        vm = await Wait(() => running);
+        Check("cancel ends as Cancelled and removes the placeholder", vm.State == JobState.Cancelled && !File.Exists(stem), vm.State.ToString());
+
+        // a job that fails does not use up the free allowance; one that succeeds does
+        long used = Db.FilesUsed;
+        JobRunner.Start(jpg, new[] { bad });
+        await Wait(Newest);
+        Check("failed job does not count", Db.FilesUsed == used);
+        JobRunner.Start(jpg, new[] { png });
+        await Wait(Newest);
+        Check("successful job counts once", Db.FilesUsed == used + 1, $"{used} -> {Db.FilesUsed}");
+
+        // output folder setting
+        var elsewhere = Directory.CreateDirectory(Path.Combine(dir, "elsewhere")).FullName;
+        Settings.OutputDir = elsewhere;
+        JobRunner.Start(jpg, new[] { png });
+        vm = await Wait(Newest);
+        Settings.OutputDir = "";
+        Check("chosen output folder is used", vm.State == JobState.Done && Path.GetDirectoryName(vm.Output) == elsewhere, vm.Output);
+
+        // folder names that contain a dot
+        var dotted = Directory.CreateDirectory(Path.Combine(dir, "my.folder")).FullName;
+        File.WriteAllText(Path.Combine(dotted, "x.txt"), "x");
+        var zipOp = Registry.All().First(o => o.Id == "t.zip");
+        JobRunner.Start(zipOp, new[] { dotted });
+        vm = await Wait(Newest);
+        Check("folder named my.folder zips to my.folder.zip", Path.GetFileName(vm.Output) == "my.folder.zip", vm.Output);
+
+        // limit: no job is created and the event fires
+        int jobsBefore = JobRunner.Jobs.Count; bool fired = false;
+        void H() => fired = true;
+        JobRunner.LimitReached += H;
+        Db.AddUsed(Db.FreeFiles - (int)Db.FilesUsed); // use up exactly what is left
+        JobRunner.Start(jpg, new[] { png });
+        JobRunner.LimitReached -= H;
+        Check("over the limit: paywall event, no job", fired && JobRunner.Jobs.Count == jobsBefore);
+        Check("actions still work over the limit", Registry.For(new[] { png }, OpKind.Action).Count > 0);
     }
 }

@@ -181,7 +181,8 @@ public partial class WheelWindow : Window
         var at = Anchor ?? cur;
         double px = Size / Native.DipScale(at);
         var wa = System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point(at.X, at.Y)).WorkingArea;
-        double cx = Anchor == null ? wa.Left + wa.Width / 2.0 : at.X, cy = Anchor == null ? wa.Top + wa.Height / 2.0 : at.Y;
+        // keyboard mode centres on the monitor; a drag opens under the cursor
+        double cx = _keyboard ? wa.Left + wa.Width / 2.0 : at.X, cy = _keyboard ? wa.Top + wa.Height / 2.0 : at.Y;
         int x = (int)Math.Clamp(cx - px / 2, wa.Left, Math.Max(wa.Left, wa.Right - px));
         int y = (int)Math.Clamp(cy - px / 2, wa.Top, Math.Max(wa.Top, wa.Bottom - px));
         Native.SetWindowPos(h, new IntPtr(-1), x, y, (int)px, (int)px, 0x10 /* SWP_NOACTIVATE */);

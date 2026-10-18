@@ -19,8 +19,11 @@ public static class ShellSelection
     public static Task<List<string>> ForDragAsync(IntPtr root, POINT start) => RunSta(() =>
     {
         var (found, name, el) = HitItem(start);
+        Trace.Log($"hit item found={found} name='{name}'");
         if (found && name == null) return new List<string>(); // pressed on empty space: a marquee, not a file drag
-        return SelectionOf(root, name, el);
+        var sel = SelectionOf(root, name, el);
+        Trace.Log($"selection {sel.Count}: {string.Join(" | ", sel)}");
+        return sel;
     });
 
     public static Task<List<string>> ForForegroundAsync() => RunSta(() =>

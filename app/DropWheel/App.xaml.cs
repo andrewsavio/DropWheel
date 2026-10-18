@@ -19,6 +19,7 @@ public partial class App : Application
     WheelWindow? _wheel;
     SettingsWindow? _settings;
     bool _dragging;
+    Task<List<string>>? _pending; // read as soon as a drag starts, so the wheel is ready when the key is pressed
 
     protected override async void OnStartup(StartupEventArgs e)
     {
@@ -38,6 +39,7 @@ public partial class App : Application
         JobRunner.LimitReached += () => Dispatcher.BeginInvoke(() => new PaywallWindow().Show());
 
         _hook = new InputHook { KeyFor = Settings.KeyFor };
+        _hook.DragStarted += (start, root) => _pending = ShellSelection.ForDragAsync(root, start);
         _hook.Triggered += OnDragTrigger;
         _hook.Released += OnDragRelease;
         _hook.Start();
@@ -61,7 +63,8 @@ public partial class App : Application
     {
         _dragging = true;
         List<string> paths;
-        try { paths = await ShellSelection.ForDragAsync(root, start); } catch { paths = new(); }
+        try { paths = await (_pending ?? ShellSelection.ForDragAsync(root, start)); } catch { paths = new(); }
+        Trace.Log($"paths {paths.Count}, still dragging={_dragging}");
         if (!_dragging || paths.Count == 0) return; // released meanwhile, or a marquee on empty space
         CloseWheel();
         var w = new WheelWindow(mode, paths, keyboard: false);

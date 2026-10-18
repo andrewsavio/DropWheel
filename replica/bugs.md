@@ -1,0 +1,32 @@
+# Bugs
+
+Only things reproduced. Severity: S1 data loss, security, legal or core flow blocked; S2 feature broken, no workaround; S3 wrong with a workaround; S4 cosmetic.
+
+## Fixed
+
+| ID | sev | title | steps and result | cause and fix |
+| --- | --- | --- | --- | --- |
+| B1 | S1 | PDF library cannot be sold | PDFsharp 6.5 throws "The loaded license is not valid" at the first `new PdfDocument()`; its license is AGPL-3.0 | replaced with PdfPig (Apache-2.0); merge, split and strip all use its merger. Found by the self-test |
+| B2 | S2 | Zip tool crashed | Zip a folder: `IOException: ... already exists` | the output name is reserved on disk first, and `ZipFile.Open(Create)` refuses an existing file. Now writes through a stream. Found by the self-test |
+| B3 | S2 | Wheel opened in the middle of the screen during a drag | drag.ps1 drop: wheel centre was 400+ px from the cursor | placement used "no anchor" to mean keyboard mode, and the drag path also passes no anchor. Now keyed on keyboard mode. After fix: 1 px from cursor. Found by drag.ps1 |
+| B4 | S3 | Wheel took about 0.7 s to appear after the trigger | trace: trigger 22:06:27.098, wheel 22:06:27.787 | selection and UI Automation lookup started only at the trigger; now starts when the drag starts. After fix: about 0.2 s |
+| B5 | S3 | "Unpack" of `a.tar.gz` made a folder named `a.tar` | self-test | output naming only removed the last extension |
+| B6 | S3 | Locked, missing and corrupt images all said "Install the matching Image Extension" | self-test messages | only the decode step was wrapped; now file-access errors and damaged files get their own messages, and the Store hint appears only for HEIC/WebP/AVIF |
+
+Test-script mistakes, not app bugs, found along the way: `SetCursorPos` does not reach mouse hooks (use `mouse_event`); `Move` is an alias of `Move-Item`; `SetFocus` selects an Explorer item; Explorer reuses an open window and its old selection.
+
+## Open
+
+None at S1 or S2.
+
+| ID | sev | title | notes |
+| --- | --- | --- | --- |
+| B7 | S3 | No progress percentage except for ffmpeg jobs | other engines show a moving bar with "Working" |
+| B8 | S3 | Release builds accept no license key | by design until a vendor is chosen; the debug key is `DEV-UNLOCK` |
+| B9 | S3 | Mixed file types (for example PNG + PDF) get no options | would need grouping by type |
+
+## To check (not reproduced)
+- Drag from the desktop, from a background Explorer tab, on a second monitor at another scale, and from an elevated window. The code handles the first three; the last cannot work by design.
+- Whether Alt as the Actions key shows the Windows menu bar in some apps.
+- The 20-file counter counts per input file, but a batch Zip of 5 files counts 5. Decide if that is what you want.
+- Engine paths (ffmpeg, ImageMagick, pandoc, LibreOffice, Poppler, Ghostscript) are written but have never run.
