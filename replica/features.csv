@@ -1,6 +1,6 @@
 feature,area,priority,original,clone,notes
 Drag + modifier opens format wheel,core,must,yes,yes,"tested with real mouse+Explorer (e2e/drag.ps1): opens under cursor ~0.2 s, cancel, marquee, no-key cases pass; desktop, tabs, multi-monitor untested"
-Convert image formats,convert,must,yes,yes,all tested: native JPG PNG BMP TIFF GIF; WebP AVIF HEIC out via ImageMagick (output file made, not opened in a viewer)
+Convert image formats,convert,must,yes,yes,"all tested: native JPG PNG BMP TIFF GIF; WebP AVIF HEIC out via ImageMagick (output file made, not opened in a viewer)"
 Convert audio formats,convert,must,yes,yes,"8 formats tested with ffmpeg 8; checks look at file size, not playback"
 Convert video formats,convert,must,yes,yes,"6 formats + audio extract tested with ffmpeg; size checks only, not played"
 Archive convert (ZIP TAR GZIP; RAR in),convert,should,yes,yes,tested zip/tar.gz; RAR/7z in via 7-Zip
