@@ -1,0 +1,39 @@
+<Window x:Class="DropWheel.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="DropWheel settings" Width="{StaticResource SettingsWidth}" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen" Background="{StaticResource Surface}"
+        FontFamily="{StaticResource FontSans}" FontSize="{StaticResource TextSm}" Foreground="{StaticResource Text}">
+  <StackPanel Margin="24">
+    <TextBlock Text="Triggers" FontSize="{StaticResource TextLg}" FontWeight="SemiBold" Margin="0,0,0,4"/>
+    <TextBlock Text="Hold one of these keys while dragging a file in Explorer or on the desktop." Foreground="{StaticResource TextMuted}" Margin="0,0,0,12" TextWrapping="Wrap"/>
+    <Grid Margin="0,0,0,4">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="120"/></Grid.ColumnDefinitions>
+      <Grid.RowDefinitions><RowDefinition/><RowDefinition/><RowDefinition/></Grid.RowDefinitions>
+      <TextBlock Text="Convert" VerticalAlignment="Center" Margin="0,0,0,8"/>
+      <ComboBox x:Name="CbConvert" Grid.Column="1" Margin="0,0,0,8" AutomationProperties.Name="Convert key" SelectionChanged="Key_Changed"/>
+      <TextBlock Text="File tools" Grid.Row="1" VerticalAlignment="Center" Margin="0,0,0,8"/>
+      <ComboBox x:Name="CbTools" Grid.Row="1" Grid.Column="1" Margin="0,0,0,8" AutomationProperties.Name="Tools key" SelectionChanged="Key_Changed"/>
+      <TextBlock Text="File actions" Grid.Row="2" VerticalAlignment="Center"/>
+      <ComboBox x:Name="CbActions" Grid.Row="2" Grid.Column="1" AutomationProperties.Name="Actions key" SelectionChanged="Key_Changed"/>
+    </Grid>
+    <TextBlock Text="Keyboard: select a file in Explorer and press Ctrl+Alt+T." Foreground="{StaticResource TextMuted}" Margin="0,8,0,20"/>
+
+    <TextBlock Text="Output" FontSize="{StaticResource TextLg}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+    <DockPanel Margin="0,0,0,4">
+      <Button Content="Clear" Style="{StaticResource Btn}" DockPanel.Dock="Right" Margin="8,0,0,0" Click="ClearOut_Click"/>
+      <Button Content="Browse…" Style="{StaticResource Btn}" DockPanel.Dock="Right" Margin="8,0,0,0" Click="BrowseOut_Click"/>
+      <TextBox x:Name="OutBox" IsReadOnly="True" Height="34" VerticalContentAlignment="Center" Padding="8,0" AutomationProperties.Name="Output folder"/>
+    </DockPanel>
+    <TextBlock Text="Empty means next to the original file. Existing files are never overwritten." Foreground="{StaticResource TextMuted}" Margin="0,0,0,20"/>
+
+    <CheckBox x:Name="StartBox" Content="Start with Windows" Margin="0,0,0,20" Checked="Start_Changed" Unchecked="Start_Changed"/>
+
+    <TextBlock Text="License" FontSize="{StaticResource TextLg}" FontWeight="SemiBold" Margin="0,0,0,4"/>
+    <TextBlock x:Name="LicenseText" Margin="0,0,0,20" TextWrapping="Wrap"/>
+
+    <TextBlock Text="Engines" FontSize="{StaticResource TextLg}" FontWeight="SemiBold" Margin="0,0,0,4"/>
+    <TextBlock x:Name="EngineText" TextWrapping="Wrap" Foreground="{StaticResource TextMuted}" Margin="0,0,0,16"/>
+    <Button Content="Check again" Style="{StaticResource Btn}" HorizontalAlignment="Left" Click="Recheck_Click"/>
+  </StackPanel>
+</Window>

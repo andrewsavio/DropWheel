@@ -1,0 +1,18 @@
+<Window x:Class="DropWheel.PaywallWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Free files used up" Width="420" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen" Topmost="True" Background="{StaticResource Bg}"
+        FontFamily="{StaticResource FontSans}" FontSize="{StaticResource TextSm}" Foreground="{StaticResource Text}">
+  <StackPanel Margin="24">
+    <TextBlock Text="You've used your free files" FontSize="{StaticResource TextLg}" FontWeight="SemiBold" Margin="0,0,0,8"/>
+    <TextBlock x:Name="Body" TextWrapping="Wrap" Foreground="{StaticResource TextMuted}" Margin="0,0,0,16"/>
+    <TextBlock Text="License key" Margin="0,0,0,4"/>
+    <TextBox x:Name="KeyBox" Height="34" VerticalContentAlignment="Center" Padding="8,0" AutomationProperties.Name="License key"/>
+    <TextBlock x:Name="Error" Foreground="{StaticResource Danger}" Margin="0,6,0,0" TextWrapping="Wrap"/>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+      <Button Content="Not now" Style="{StaticResource BtnGhost}" Margin="0,0,8,0" IsCancel="True"/>
+      <Button Content="Unlock" Style="{StaticResource BtnPrimary}" IsDefault="True" Click="Unlock_Click"/>
+    </StackPanel>
+  </StackPanel>
+</Window>
