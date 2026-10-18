@@ -45,6 +45,8 @@ public static class Registry
     static readonly string[] SlideIn = { "ppt", "pptx", "odp" };
     static readonly string[] ArchiveIn = { "zip", "tar", "tar.gz", "tgz", "gz", "rar", "7z" };
 
+    static readonly RunFn NoRun = (s, d, p, ct) => Task.CompletedTask; // tools with a prompt run through RunWith
+
     public static List<Op> All()
     {
         var ops = new List<Op>();
@@ -101,7 +103,7 @@ public static class Registry
         // ---- PDF out
         foreach (var o in new[] { "jpg", "png" })
             ops.Add(new Op("pdf>" + o, OpKind.Convert, Up(o), "PDF", $"One {Up(o)} per page", In("pdf"), "",
-                (s, d, p, ct) => PdfToImages(s, d, o, ct), poppler, "Poppler") { IsFolderOut = true, Suffix = " (pages)" });
+                (s, d, p, ct) => poppler ? PdfToImages(s, d, o, ct) : Tools.PdfToImages(s, d, o, p, ct)) { IsFolderOut = true, Suffix = " (pages)" });
         ops.Add(new Op("pdf>txt", OpKind.Convert, "TXT", "PDF", "Extract text", In("pdf"), "txt",
             (s, d, p, ct) => Engines.Run("pdftotext", new[] { "-layout", s, d }, ct), Engines.Has("pdftotext"), "Poppler"));
         ops.Add(new Op("pdf>md", OpKind.Convert, "MD", "PDF", "Extract text as Markdown (layout not kept)", In("pdf"), "md",
@@ -140,6 +142,28 @@ public static class Registry
             (s, d, p, ct) => Task.Run(() => PdfSplit(s, d, p, ct), ct)) { IsFolderOut = true, Suffix = " (split)" });
         ops.Add(new Op("t.pdf.merge", OpKind.Tool, "Merge", "PDF", "Join PDFs in the order selected", In("pdf"), "pdf",
             (s, d, p, ct) => Task.Run(() => PdfMerge(s.Split('\n'), d), ct)) { Batch = true, MinFiles = 2, Suffix = "-merged" });
+        // ---- "I love" style tools: each asks one question, checked before the job starts
+        var sizable = magick ? ImgIn : new[] { "jpg", "jpeg", "png", "bmp", "tif", "tiff", "gif" };
+        ops.Add(new Op("t.img.resize", OpKind.Tool, "Resize", "Image", "Exact size, width, height or percent; enlarges too", In(sizable), "", NoRun)
+        { SameExt = true, Suffix = "-resized", Prompt = Sizes.ResizeHelp, Check = Sizes.CheckResize, RunWith = (s, d, a, p, ct) => Tools.Resize(s, d, Sizes.Parse(a)!.Value, ct) });
+        ops.Add(new Op("t.img.target", OpKind.Tool, "Compress to…", "Image", "JPG at a file size or quality you choose", In(sizable), "jpg", NoRun)
+        { Suffix = "-compressed", Prompt = Sizes.TargetHelp, Check = Sizes.CheckTarget, RunWith = (s, d, a, p, ct) => Task.Run(() => Tools.CompressTo(s, d, Sizes.Target(a)!.Value, ct), ct) });
+        ops.Add(new Op("t.img.rotate", OpKind.Tool, "Rotate", "Image", "Turn 90° clockwise", In(sizable), "",
+            (s, d, p, ct) => Task.Run(() => Tools.Rotate(s, d, 90), ct)) { SameExt = true, Suffix = "-rotated" });
+        ops.Add(new Op("t.img.topdf", OpKind.Tool, "To PDF", "Image", "One PDF, a page per picture, in the order selected", In(sizable), "pdf",
+            (s, d, p, ct) => Task.Run(() => Tools.ImagesToPdf(s.Split('\n'), d, p, ct), ct)) { Batch = true });
+        ops.Add(new Op("t.vid.resize", OpKind.Tool, "Resize", "Video", "Exact size, width, height or percent", In(VideoIn), "mp4", NoRun, ffmpeg, "ffmpeg")
+        { Suffix = "-resized", Prompt = Sizes.ResizeHelp, Check = Sizes.CheckResize,
+          RunWith = (s, d, a, p, ct) => Ffmpeg(s, d, new[] { "-vf", Tools.ScaleFilter(Sizes.Parse(a)!.Value), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "21", "-c:a", "aac" }, p, ct) });
+        ops.Add(new Op("t.vid.target", OpKind.Tool, "Compress to…", "Video", "MP4 close to the file size you choose", In(VideoIn), "mp4", NoRun, ffmpeg, "ffmpeg")
+        { Suffix = "-compressed", Prompt = "Target file size, like 25 MB.", Check = Sizes.CheckBytes,
+          RunWith = async (s, d, a, p, ct) => await Ffmpeg(s, d, await Tools.VideoForSize(s, Sizes.Target(a)!.Value.bytes!.Value, ct), p, ct) });
+        ops.Add(new Op("t.aud.target", OpKind.Tool, "Compress to…", "Audio", "MP3 close to the file size you choose", In(AudioIn), "mp3", NoRun, ffmpeg, "ffmpeg")
+        { Suffix = "-compressed", Prompt = "Target file size, like 3 MB.", Check = Sizes.CheckBytes,
+          RunWith = async (s, d, a, p, ct) => await Ffmpeg(s, d, await Tools.AudioForSize(s, Sizes.Target(a)!.Value.bytes!.Value, ct), p, ct) });
+        ops.Add(new Op("t.pdf.shrink", OpKind.Tool, "Compress", "PDF", "Smaller PDF; pages become images, text not selectable", In("pdf"), "pdf", NoRun, !gs)
+        { Suffix = "-compressed", Prompt = "How strong: low, medium or strong.", Check = Tools.CheckPdfLevel,
+          RunWith = (s, d, a, p, ct) => Tools.PdfShrink(s, d, Tools.PdfLevel(a)!.Value, p, ct) });
         ops.Add(new Op("t.pdf.redact", OpKind.Tool, "Redact", "PDF", "Black out words you name; pages become images", In("pdf"), "pdf",
             (s, d, p, ct) => Task.CompletedTask) { Suffix = "-redacted", Prompt = "Words or phrases to black out, separated by commas.",
             RunWith = (s, d, terms, p, ct) => PdfRedact(s, d, terms, p, ct) });
@@ -318,12 +342,7 @@ public static class Registry
                     }
                 }
 
-            using var rp = render.GetPage((uint)(n - 1));
-            using var ms = new Windows.Storage.Streams.InMemoryRandomAccessStream();
-            await rp.RenderToStreamAsync(ms, new Windows.Data.Pdf.PdfPageRenderOptions { DestinationWidth = (uint)Math.Round(page.Width * Scale) });
-            ms.Seek(0);
-            var frame = BitmapDecoder.Create(ms.AsStreamForRead(), BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
-            var rgb = new FormatConvertedBitmap(frame, PixelFormats.Bgr24, null, 0);
+            var rgb = await Tools.RenderPage(render, (uint)(n - 1), 72 * Scale);
             int w = rgb.PixelWidth, h = rgb.PixelHeight, stride = w * 3;
             var px = new byte[stride * h];
             rgb.CopyPixels(px, stride, 0);
@@ -467,7 +486,7 @@ public static class Wic
     }
 
     /// <summary>Alpha is flattened onto white, because JPG and BMP cannot hold it and black is the wrong default.</summary>
-    static BitmapSource OnWhite(BitmapSource s)
+    internal static BitmapSource OnWhite(BitmapSource s)
     {
         var bgra = new FormatConvertedBitmap(s, PixelFormats.Bgra32, null, 0);
         int stride = bgra.PixelWidth * 4;

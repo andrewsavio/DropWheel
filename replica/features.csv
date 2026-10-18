@@ -10,7 +10,7 @@ PDF to DOCX/PPTX/XLSX/EPUB,convert,could,yes,partial,"DOCX PPTX EPUB best effort
 Spreadsheet convert (XLSX ODS CSV TSV),convert,could,yes,partial,needs LibreOffice; untested
 Slides PPT/PPTX to PDF/JPG/PNG,convert,could,yes,partial,needs LibreOffice (+ Poppler for images); untested
 Tools wheel,tools,should,yes,yes,"Ctrl by default, rebindable"
-Compress image/video/audio/PDF incl target size,tools,should,yes,partial,"image, video and audio tested; PDF needs Ghostscript (AGPL, user-installed), target size not built"
+Compress image/video/audio/PDF incl target size,tools,should,yes,yes,"fixed presets plus Compress to… a size or quality for images, video and audio; PDF compress without Ghostscript (pages become images)"
 Crop / trim / redact,tools,could,yes,no,needs a parameter UI
 Edit or strip metadata,tools,could,yes,partial,strip for images and PDF tested; editing not built
 Merge / split PDF,tools,could,yes,yes,"PdfPig (Apache-2.0), tested"
@@ -26,7 +26,11 @@ Touch drag/hold,core,could,yes,no,not built or tested
 Local-only processing,privacy,must,yes,yes,no network code
 Free 20 files then paid unlock,business,could,yes,skip,"own pricing decision; counter + paywall built and tested, no license vendor yet"
 Document redaction (offline),tools,must,yes,yes,"PDF only: words you name are blacked out and pages rewritten as images (text layer gone, self-test proves it); no regex, no rotation, no DOCX; prompt dialog not seen by hand"
-Command-context in-place tools (bitrate slider / redact menu),tools,should,yes,partial,"one-question prompt exists (Op.Prompt) and is used by redact only; bitrate/quality/target-size not wired"
-Smart MIME-based format recommendations,core,should,yes,partial,"options filtered by type; no ranking of likely targets"
-Offline-only (no network capability),privacy,must,yes,yes,"no network code found in source; no installer entitlements to check"
-Sandboxed / least-privilege packaging,privacy,could,yes,no,"PRD App Sandbox; Windows equivalent is MSIX; not packaged"
+Command-context in-place tools (bitrate slider / redact menu),tools,should,yes,yes,"tools ask one checked question (size, target, strength, words) before running; text box, not sliders"
+Smart MIME-based format recommendations,core,should,yes,partial,options filtered by type; no ranking of likely targets
+Offline-only (no network capability),privacy,must,yes,yes,no network code found in source; no installer entitlements to check
+Sandboxed / least-privilege packaging,privacy,could,yes,no,PRD App Sandbox; Windows equivalent is MSIX; not packaged
+"Resize / enlarge to exact px, width, height, % or print size",tools,should,yes,yes,"images (ImageMagick Lanczos or Windows) and video; 1920x1080, 800, x600, 50%, 2x, 6x4in@300dpi; enlarging is plain scaling, no AI upscaling"
+Images to one PDF,tools,could,yes,yes,"batch, page per picture, no engine needed"
+PDF to JPG/PNG without extra installs,convert,could,yes,yes,Windows PDF renderer at 150 dpi when Poppler is missing
+Rotate image,tools,could,yes,yes,90° clockwise

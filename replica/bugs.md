@@ -37,3 +37,6 @@ None at S1 or S2.
 - Engine paths (ffmpeg, ImageMagick, pandoc, LibreOffice, Poppler, Ghostscript) are written but have never run.
 
 - Live drag e2e (`e2e/drag.ps1`) was not re-run on the pie wheel: the run failed because a full-screen browser was in front of Explorer, so no wheel could be dragged over. Not a product result. Run it with the desktop clear, using the Release exe: `pwsh e2e/drag.ps1 -Exe <Release exe> -Slots 8`. Note the script defaults to the Debug path.
+
+- e2e drag tests write to the real `%LOCALAPPDATA%\DropWheel` database and use up the free-file allowance (found 2026-10-18 when the paywall replaced the Resize dialog). Give the app a data-folder override for tests.
+- Resize without ImageMagick (Windows scaler fallback) is not covered by the self-test on this machine, since ImageMagick is installed.

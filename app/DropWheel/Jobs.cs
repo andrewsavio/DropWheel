@@ -56,7 +56,7 @@ public static class JobRunner
         if (!Db.Allows(paths.Count)) { LimitReached?.Invoke(); return; }
         if (op.Prompt != null && op.RunWith != null)
         {
-            var answer = InputDialog.Ask(op.Label, op.Prompt);
+            var answer = InputDialog.Ask(op.Label, op.Prompt, op.Check);
             if (string.IsNullOrWhiteSpace(answer)) return;
             var with = op.RunWith;
             op = op with { Run = (s, d, p, ct) => with(s, d, answer, p, ct) };

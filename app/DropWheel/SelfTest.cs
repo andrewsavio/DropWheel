@@ -135,6 +135,7 @@ public static class SelfTest
             Check("bad key rejected", !Db.TryUnlock("nope"));
 
             await EngineChecks(dir, png);
+            await ToolChecks(dir, png);
 
             Log.AppendLine("engines: " + string.Join(", ", new[] { "ffmpeg", "magick", "pandoc", "soffice", "7z", "pdftoppm", "gswin64c" }.Select(e => $"{e}={(Engines.Has(e) ? "yes" : "no")}")));
             Log.AppendLine("ops available: " + Registry.All().Count(o => o.Available) + " of " + Registry.All().Count);
@@ -147,6 +148,103 @@ public static class SelfTest
     }
 
     // Only runs for engines that are installed; each check feeds a real file through the real op and looks at the output.
+    /// <summary>Runs an engine and returns its stdout, for checking that an output really decodes.</summary>
+    static string Cap(string exe, params string[] args)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo(Engines.Find(exe)!) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (var a in args) psi.ArgumentList.Add(a);
+        using var p = System.Diagnostics.Process.Start(psi)!;
+        var o = p.StandardOutput.ReadToEnd(); p.WaitForExit(15000);
+        return o.Trim();
+    }
+
+    /// <summary>ffprobe reads the file and reports about 2 s of media (the test clips are 2 s long).</summary>
+    static bool Plays(string path)
+    {
+        if (!Engines.Has("ffprobe")) return true;
+        var d = Cap("ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", path);
+        return double.TryParse(d, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var s) && s > 1.5 && s < 2.6;
+    }
+
+    /// <summary>ImageMagick decodes the image and finds the expected width.</summary>
+    static bool ImageWidth(string path, int w) => Cap("magick", "identify", "-format", "%w", path + "[0]") == w.ToString();
+
+    /// <summary>Runs a prompting tool the way the wheel does: answer checked first, then RunWith.</summary>
+    static async Task<string> Ask(string id, string answer, params string[] src)
+    {
+        var op = Registry.All().First(o => o.Id == id);
+        if (op.Check?.Invoke(answer) is string bad) throw new InvalidOperationException("rejected: " + bad);
+        var dst = Output.Reserve(op, src[0]);
+        await op.RunWith!(string.Join('\n', src), dst, answer, _ => { }, default);
+        return dst;
+    }
+
+    static int Height(string path) => Open(path).PixelHeight;
+
+    static string Noise(string path, int w, int h)
+    {
+        var px = new byte[w * h * 3];
+        new Random(7).NextBytes(px);
+        var enc = new PngBitmapEncoder();
+        enc.Frames.Add(BitmapFrame.Create(BitmapSource.Create(w, h, 96, 96, PixelFormats.Bgr24, null, px, w * 3)));
+        using (var fs = File.Create(path)) enc.Save(fs);
+        return path;
+    }
+
+    static async Task ToolChecks(string dir, string png)
+    {
+        async Task T(string name, Func<Task<(bool ok, string info)>> body)
+        {
+            try { var (ok, info) = await body(); Check(name, ok, info); }
+            catch (Exception e) { Check(name, false, e.Message); }
+        }
+
+        // the size language
+        var cases = new (string text, int w, int h)[] { ("32", 32, 24), ("x24", 32, 24), ("32 px", 32, 24), ("200%", 128, 96), ("2x", 128, 96), ("100x30", 100, 30), ("100 × 30", 100, 30), ("1in@100dpi", 100, 75), ("h12", 16, 12), ("800x", 800, 600) };
+        foreach (var (text, w, h) in cases)
+        {
+            var spec = Sizes.Parse(text);
+            Check($"size '{text}' on 64x48 is {w}x{h}", spec?.For(64, 48) == (w, h), spec is { } v ? $"{v.For(64, 48)}" : "not understood");
+        }
+        Check("nonsense sizes are refused", new[] { "abc", "", "0x0", "-5", "99999x2", "200%%" }.All(t => Sizes.Parse(t) == null));
+        Check("targets: 200 KB, 1.5mb, 70%", Sizes.Target("200 KB") == (204800L, null) && Sizes.Target("1.5mb") == (1572864L, null) && Sizes.Target("70%") == (null, 70));
+        Check("bad targets are refused", Sizes.CheckTarget("big") != null && Sizes.CheckTarget("150%") != null && Sizes.CheckBytes("70%") != null);
+
+        // images
+        foreach (var (answer, w, h) in new[] { ("32", 32, 24), ("200%", 128, 96), ("100x30", 100, 30) })
+            await T($"resize png to {answer}", async () => { var o = await Ask("t.img.resize", answer, png); return (Width(o) == w && Height(o) == h && o.EndsWith(".png"), $"{Width(o)}x{Height(o)} {Path.GetFileName(o)}"); });
+        await T("rotate turns 64x48 into 48x64", async () => { var o = await Run("t.img.rotate", png); return (Width(o) == 48 && Height(o) == 64, $"{Width(o)}x{Height(o)}"); });
+        var big = Noise(Path.Combine(dir, "noise.png"), 1200, 900);
+        await T("compress to 60 KB fits and still opens", async () => { var o = await Ask("t.img.target", "60 KB", big); var n = new FileInfo(o).Length; return (n <= 60 * 1024 && Width(o) > 0, $"{n / 1024} KB, {Width(o)}x{Height(o)}"); });
+        await T("compress at 50% quality", async () => { var o = await Ask("t.img.target", "50%", big); return (new FileInfo(o).Length < new FileInfo(big).Length && Width(o) == 1200, $"{new FileInfo(o).Length / 1024} KB"); });
+        string twoPages = "";
+        await T("two pictures become a 2-page PDF", async () => { twoPages = await Run("t.img.topdf", png, big); using var d = PdfDocument.Open(twoPages); return (d.NumberOfPages == 2, d.NumberOfPages + " pages"); });
+
+        // PDF without Ghostscript or Poppler
+        await T("PDF to JPG with the Windows renderer", async () =>
+        {
+            var folder = Path.Combine(dir, "pages"); await Tools.PdfToImages(twoPages, folder, "jpg", _ => { }, default);
+            var files = Directory.GetFiles(folder, "*.jpg"); return (files.Length == 2 && Width(files[0]) > 0, files.Length + " files");
+        });
+        await T("PDF compress makes a scan-like PDF smaller", async () =>
+        {
+            var o = await Ask("t.pdf.shrink", "strong", twoPages); using var d = PdfDocument.Open(o);
+            return (d.NumberOfPages == 2 && new FileInfo(o).Length < new FileInfo(twoPages).Length, $"{new FileInfo(twoPages).Length / 1024} KB -> {new FileInfo(o).Length / 1024} KB");
+        });
+        Check("PDF compress refuses unknown strength", Tools.CheckPdfLevel("max power") != null);
+
+        if (!Engines.Has("ffmpeg")) return;
+        var mp4 = Path.Combine(dir, "clip.mp4"); var wav = Path.Combine(dir, "tone.wav");
+        await T("video resize to 80 wide", async () =>
+        {
+            var o = await Ask("t.vid.resize", "80", mp4);
+            var wh = Cap("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0", o);
+            return (wh == "80,60" && Plays(o), wh);
+        });
+        await T("video compress to 40 KB lands near 40 KB", async () => { var o = await Ask("t.vid.target", "40 KB", mp4); var n = new FileInfo(o).Length; return (n < 40 * 1024 * 1.35 && Plays(o), $"{n / 1024} KB"); });
+        await T("audio compress to 16 KB lands near 16 KB", async () => { var o = await Ask("t.aud.target", "16 KB", wav); var n = new FileInfo(o).Length; return (n < 16 * 1024 * 1.35 && n > 16 * 1024 * 0.5 && Plays(o), $"{n / 1024} KB"); });
+    }
+
     static async Task EngineChecks(string dir, string png)
     {
         async Task Try(string name, string id, string src, Func<string, bool> ok)
@@ -156,20 +254,20 @@ public static class SelfTest
         }
         if (Engines.Has("magick"))
         {
-            await Try("magick png>webp", "img>webp", png, o => File.ReadAllBytes(o)[8] == (byte)'W');
-            await Try("magick png>avif", "img>avif", png, o => true);
-            await Try("magick png>heic", "img>heic", png, o => true);
+            await Try("magick png>webp", "img>webp", png, o => File.ReadAllBytes(o)[8] == (byte)'W' && ImageWidth(o, 64));
+            await Try("magick png>avif", "img>avif", png, o => ImageWidth(o, 64));
+            await Try("magick png>heic", "img>heic", png, o => ImageWidth(o, 64));
         }
         if (Engines.Has("ffmpeg"))
         {
             var mp4 = Path.Combine(dir, "clip.mp4"); var wav = Path.Combine(dir, "tone.wav");
             await Engines.Run("ffmpeg", new[] { "-y", "-f", "lavfi", "-i", "testsrc=duration=2:size=160x120:rate=15", "-f", "lavfi", "-i", "sine=duration=2", "-shortest", "-pix_fmt", "yuv420p", mp4 }, default);
             await Engines.Run("ffmpeg", new[] { "-y", "-f", "lavfi", "-i", "sine=duration=2", wav }, default);
-            foreach (var o in new[] { "mov", "mkv", "webm", "avi", "wmv", "gif" }) await Try("ffmpeg mp4>" + o, "vid>" + o, mp4, _ => true);
-            await Try("ffmpeg extract mp3", "vid>mp3", mp4, _ => true);
-            foreach (var o in new[] { "mp3", "m4a", "flac", "ogg", "opus", "aiff", "wma" }) await Try("ffmpeg wav>" + o, "aud>" + o, wav, _ => true);
-            await Try("ffmpeg compress video", "t.vid.compress", mp4, _ => true);
-            await Try("ffmpeg compress audio", "t.aud.compress", wav, _ => true);
+            foreach (var o in new[] { "mov", "mkv", "webm", "avi", "wmv", "gif" }) await Try("ffmpeg mp4>" + o, "vid>" + o, mp4, Plays);
+            await Try("ffmpeg extract mp3", "vid>mp3", mp4, Plays);
+            foreach (var o in new[] { "mp3", "m4a", "flac", "ogg", "opus", "aiff", "wma" }) await Try("ffmpeg wav>" + o, "aud>" + o, wav, Plays);
+            await Try("ffmpeg compress video", "t.vid.compress", mp4, Plays);
+            await Try("ffmpeg compress audio", "t.aud.compress", wav, Plays);
             var srt = Path.Combine(dir, "e.srt"); File.WriteAllLines(srt, new[] { "1", "00:00:01,000 --> 00:00:02,000", "Hi" });
             await Try("ffmpeg srt>vtt", "sub>vtt", srt, o => File.ReadAllText(o).StartsWith("WEBVTT"));
         }

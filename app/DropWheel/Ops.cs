@@ -22,6 +22,7 @@ public sealed record Op(
     public bool SameExt { get; init; }     // output keeps the source extension
     public string? Prompt { get; init; }   // ask the user for one value first (a word to redact); null = no question
     public Func<string, string, string, Action<double>, CancellationToken, Task>? RunWith { get; init; } // like Run, plus the answer
+    public Func<string, string?>? Check { get; init; } // returns an error message for a bad answer, shown in the prompt
     public int MinFiles { get; init; } = 1;
     public string Suffix { get; init; } = ""; // appended to the output name: "photo-compressed.jpg"
 }
