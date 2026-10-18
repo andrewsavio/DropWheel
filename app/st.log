@@ -1,0 +1,63 @@
+PASS  image png>jpg  pic.jpg
+PASS  transparent corner becomes white, not black  pixel 254
+PASS  image png>bmp  pic.bmp
+PASS  image png>tiff  pic.tiff
+PASS  image png>gif  pic.gif
+PASS  compress image
+PASS  strip metadata keeps extension  pic-clean.jpg
+PASS  output never overwrites  pic (1).bmp
+PASS  zip -> tar.gz -> unpack keeps files  stuff (1)
+PASS  merge pdf  2 pages
+PASS  split pdf
+PASS  strip pdf author  author=''
+PASS  test pdf really had an author
+PASS  redacted pdf has no text  text=''
+PASS  redacted page keeps its look and has a black box  dark 4908, light 3126013
+PASS  redact with no match refuses
+PASS  srt to txt
+PASS  png offers jpg
+PASS  mixed png + pdf offers no conversion
+PASS  one pdf cannot merge
+PASS  two pdfs can merge
+PASS  actions work on any selection
+PASS  fresh install allows exactly 20 files
+PASS  unicode, emoji and spaces in the name  Done
+PASS  180-character file name  Done
+PASS  corrupt image fails with a message  broken.png is damaged or is not a real PNG image.
+PASS  failed job leaves no output behind
+PASS  zero-byte file fails cleanly  empty.png is damaged or is not a real PNG image.
+PASS  locked source fails cleanly, says why  locked.png is open in another program or cannot be read.
+PASS  missing source fails cleanly, says why  gone.png no longer exists.
+PASS  8 parallel jobs get 8 different files  8 distinct
+PASS  job reaches Running
+PASS  name is reserved while running
+PASS  cancel ends as Cancelled and removes the placeholder  Cancelled
+PASS  failed job does not count
+PASS  successful job counts once  10 -> 11
+PASS  chosen output folder is used  C:\Users\savio\AppData\Local\Temp\dw-test-ljkgbs4f.syg\elsewhere\pic.jpg
+PASS  folder named my.folder zips to my.folder.zip  C:\Users\savio\AppData\Local\Temp\dw-test-ljkgbs4f.syg\my.folder.zip
+PASS  over the limit: paywall event, no job
+PASS  actions still work over the limit
+PASS  bad key rejected
+PASS  magick png>webp  pic.webp 250 B
+PASS  magick png>avif  pic.avif 538 B
+PASS  magick png>heic  pic.heic 396 B
+PASS  ffmpeg mp4>mov  clip.mov 27405 B
+PASS  ffmpeg mp4>mkv  clip.mkv 26707 B
+PASS  ffmpeg mp4>webm  clip.webm 26246 B
+PASS  ffmpeg mp4>avi  clip.avi 65002 B
+PASS  ffmpeg mp4>wmv  clip.wmv 74669 B
+PASS  ffmpeg mp4>gif  clip.gif 41308 B
+PASS  ffmpeg extract mp3  clip.mp3 10968 B
+PASS  ffmpeg wav>mp3  tone.mp3 10500 B
+PASS  ffmpeg wav>m4a  tone.m4a 33982 B
+PASS  ffmpeg wav>flac  tone.flac 32514 B
+PASS  ffmpeg wav>ogg  tone.ogg 7986 B
+PASS  ffmpeg wav>opus  tone.opus 37717 B
+PASS  ffmpeg wav>aiff  tone.aiff 176454 B
+PASS  ffmpeg wav>wma  tone.wma 35742 B
+PASS  ffmpeg compress video  clip-compressed.mp4 32754 B
+PASS  ffmpeg compress audio  tone-compressed.mp3 24808 B
+PASS  ffmpeg srt>vtt  e.vtt 35 B
+engines: ffmpeg=yes, magick=yes, pandoc=no, soffice=no, 7z=yes, pdftoppm=no, gswin64c=no
+ops available: 49 of 73

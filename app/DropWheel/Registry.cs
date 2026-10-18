@@ -166,7 +166,7 @@ public static class Registry
         if (native && Ext(src) != "svg")
         {
             try { await Task.Run(() => Wic.Convert(src, dst, o, 90), ct); return; }
-            catch when (Engines.Has("magick")) { /* codec missing in Windows: retry with ImageMagick */ }
+            catch when (Engines.Has("magick") && Ext(src) is "heic" or "heif" or "webp" or "avif") { /* codec missing in Windows: retry with ImageMagick. Not for locked, missing or corrupt files: keep their clear message */ }
         }
         var args = new List<string> { Ext(src) == "gif" && o != "gif" ? src + "[0]" : src };
         if (o is "jpg" or "bmp") args.AddRange(new[] { "-background", "white", "-alpha", "remove", "-alpha", "off" });

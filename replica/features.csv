@@ -1,16 +1,16 @@
 feature,area,priority,original,clone,notes
 Drag + modifier opens format wheel,core,must,yes,yes,"tested with real mouse+Explorer (e2e/drag.ps1): opens under cursor ~0.2 s, cancel, marquee, no-key cases pass; desktop, tabs, multi-monitor untested"
-Convert image formats,convert,must,yes,partial,JPG PNG BMP TIFF GIF tested; WebP AVIF HEIC need ImageMagick (not installed here)
-Convert audio formats,convert,must,yes,partial,"needs ffmpeg; code written, untested"
-Convert video formats,convert,must,yes,partial,"needs ffmpeg; code written, untested"
+Convert image formats,convert,must,yes,yes,all tested: native JPG PNG BMP TIFF GIF; WebP AVIF HEIC out via ImageMagick (output file made, not opened in a viewer)
+Convert audio formats,convert,must,yes,yes,"8 formats tested with ffmpeg 8; checks look at file size, not playback"
+Convert video formats,convert,must,yes,yes,"6 formats + audio extract tested with ffmpeg; size checks only, not played"
 Archive convert (ZIP TAR GZIP; RAR in),convert,should,yes,yes,tested zip/tar.gz; RAR/7z in via 7-Zip
-Subtitle SRT VTT TXT,convert,could,yes,partial,SRT to TXT tested; SRT<->VTT needs ffmpeg
+Subtitle SRT VTT TXT,convert,could,yes,partial,SRT to TXT and SRT to VTT tested; VTT to SRT untested
 Document convert (DOCX MD TXT EPUB HTML RTF),convert,should,yes,partial,needs pandoc; untested
 PDF to DOCX/PPTX/XLSX/EPUB,convert,could,yes,partial,"DOCX PPTX EPUB best effort via LibreOffice, untested; XLSX not offered"
 Spreadsheet convert (XLSX ODS CSV TSV),convert,could,yes,partial,needs LibreOffice; untested
 Slides PPT/PPTX to PDF/JPG/PNG,convert,could,yes,partial,needs LibreOffice (+ Poppler for images); untested
 Tools wheel,tools,should,yes,yes,"Ctrl by default, rebindable"
-Compress image/video/audio/PDF incl target size,tools,should,yes,partial,"image tested; video/audio need ffmpeg, PDF needs Ghostscript; target size not built"
+Compress image/video/audio/PDF incl target size,tools,should,yes,partial,"image, video and audio tested; PDF needs Ghostscript (AGPL, user-installed), target size not built"
 Crop / trim / redact,tools,could,yes,no,needs a parameter UI
 Edit or strip metadata,tools,could,yes,partial,strip for images and PDF tested; editing not built
 Merge / split PDF,tools,could,yes,yes,"PdfPig (Apache-2.0), tested"

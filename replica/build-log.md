@@ -30,3 +30,8 @@ Stack changed from Electron to C# / WPF on .NET 10 (your choice: "Windows native
 | parameter prompt | partial | `Op.Prompt` + `InputDialog`; redact only |
 | engines (ffmpeg, ImageMagick) | not done | needs downloads/installs on this machine; asked the user instead |
 Self-test: 42 checks pass (2 redaction checks added plus a visual one).
+
+## Engine pass (2026-10-18)
+Installed ffmpeg (Gyan.FFmpeg) and ImageMagick 7.1.2 via winget. Added `EngineChecks` to the self-test: 3 ImageMagick outputs, 14 ffmpeg outputs, all pass; whole self-test passes. Checks confirm the output exists and is non-empty (WebP also checks its header, VTT its first line), not that it plays.
+**Bug found by installing the engines (S3, fixed):** with ImageMagick present, locked, missing and corrupt images fell back to magick and showed its raw error text instead of the clear message. The fallback now only runs for HEIC/HEIF/WebP/AVIF input.
+Still not run: pandoc, LibreOffice, Poppler, Ghostscript paths.

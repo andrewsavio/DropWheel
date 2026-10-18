@@ -134,6 +134,8 @@ public static class SelfTest
 
             Check("bad key rejected", !Db.TryUnlock("nope"));
 
+            await EngineChecks(dir, png);
+
             Log.AppendLine("engines: " + string.Join(", ", new[] { "ffmpeg", "magick", "pandoc", "soffice", "7z", "pdftoppm", "gswin64c" }.Select(e => $"{e}={(Engines.Has(e) ? "yes" : "no")}")));
             Log.AppendLine("ops available: " + Registry.All().Count(o => o.Available) + " of " + Registry.All().Count);
 
@@ -142,6 +144,35 @@ public static class SelfTest
         catch (Exception e) { Check("self-test crashed", false, e.ToString()); }
         File.WriteAllText(logPath, Log.ToString());
         return _fails;
+    }
+
+    // Only runs for engines that are installed; each check feeds a real file through the real op and looks at the output.
+    static async Task EngineChecks(string dir, string png)
+    {
+        async Task Try(string name, string id, string src, Func<string, bool> ok)
+        {
+            try { var o = await Run(id, src); var good = File.Exists(o) && new FileInfo(o).Length > 0 && ok(o); Check(name, good, Path.GetFileName(o) + " " + new FileInfo(o).Length + " B"); }
+            catch (Exception e) { Check(name, false, e.Message); }
+        }
+        if (Engines.Has("magick"))
+        {
+            await Try("magick png>webp", "img>webp", png, o => File.ReadAllBytes(o)[8] == (byte)'W');
+            await Try("magick png>avif", "img>avif", png, o => true);
+            await Try("magick png>heic", "img>heic", png, o => true);
+        }
+        if (Engines.Has("ffmpeg"))
+        {
+            var mp4 = Path.Combine(dir, "clip.mp4"); var wav = Path.Combine(dir, "tone.wav");
+            await Engines.Run("ffmpeg", new[] { "-y", "-f", "lavfi", "-i", "testsrc=duration=2:size=160x120:rate=15", "-f", "lavfi", "-i", "sine=duration=2", "-shortest", "-pix_fmt", "yuv420p", mp4 }, default);
+            await Engines.Run("ffmpeg", new[] { "-y", "-f", "lavfi", "-i", "sine=duration=2", wav }, default);
+            foreach (var o in new[] { "mov", "mkv", "webm", "avi", "wmv", "gif" }) await Try("ffmpeg mp4>" + o, "vid>" + o, mp4, _ => true);
+            await Try("ffmpeg extract mp3", "vid>mp3", mp4, _ => true);
+            foreach (var o in new[] { "mp3", "m4a", "flac", "ogg", "opus", "aiff", "wma" }) await Try("ffmpeg wav>" + o, "aud>" + o, wav, _ => true);
+            await Try("ffmpeg compress video", "t.vid.compress", mp4, _ => true);
+            await Try("ffmpeg compress audio", "t.aud.compress", wav, _ => true);
+            var srt = Path.Combine(dir, "e.srt"); File.WriteAllLines(srt, new[] { "1", "00:00:01,000 --> 00:00:02,000", "Hi" });
+            await Try("ffmpeg srt>vtt", "sub>vtt", srt, o => File.ReadAllText(o).StartsWith("WEBVTT"));
+        }
     }
 
     static string MakePng(string path)
