@@ -6,16 +6,16 @@
         FontFamily="{StaticResource FontSans}" FontSize="{StaticResource TextXs}">
   <Grid x:Name="Root" RenderTransformOrigin="0.5,0.5">
     <Grid.RenderTransform><ScaleTransform x:Name="Scale" ScaleX="1" ScaleY="1"/></Grid.RenderTransform>
-    <Ellipse Width="{StaticResource WheelDiameter}" Height="{StaticResource WheelDiameter}"
-             Fill="{StaticResource OverlayBg}" Stroke="{StaticResource OverlayBorder}" StrokeThickness="1">
-      <Ellipse.Effect><DropShadowEffect BlurRadius="40" ShadowDepth="12" Opacity="0.45"/></Ellipse.Effect>
+    <Ellipse Width="352" Height="352" Fill="{StaticResource OverlayBg}">
+      <Ellipse.Effect><DropShadowEffect BlurRadius="36" ShadowDepth="8" Opacity="0.25"/></Ellipse.Effect>
     </Ellipse>
     <Canvas x:Name="Ring" Width="{StaticResource WheelDiameter}" Height="{StaticResource WheelDiameter}"
             KeyboardNavigation.DirectionalNavigation="Cycle" KeyboardNavigation.TabNavigation="Cycle"/>
-    <Border x:Name="Hole" Width="{StaticResource WheelHole}" Height="{StaticResource WheelHole}" CornerRadius="48"
+    <Border x:Name="Hole" Width="{StaticResource WheelHole}" Height="{StaticResource WheelHole}" CornerRadius="56"
             Background="{StaticResource OverlaySurface}" AllowDrop="True" Focusable="True"
             AutomationProperties.Name="Centre">
-      <StackPanel VerticalAlignment="Center" Margin="8">
+      <StackPanel VerticalAlignment="Center" Margin="6">
+        <Image x:Name="HoleImage" Width="44" Height="44" Margin="0,0,0,2" RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="File preview"/>
         <TextBlock x:Name="HoleTitle" Foreground="{StaticResource OverlayText}" TextAlignment="Center" TextTrimming="CharacterEllipsis" FontWeight="SemiBold"/>
         <TextBlock x:Name="HoleSub" Foreground="{StaticResource OverlayTextMuted}" TextAlignment="Center" TextTrimming="CharacterEllipsis"/>
       </StackPanel>

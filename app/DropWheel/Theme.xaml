@@ -24,19 +24,19 @@
   <SolidColorBrush x:Key="Success" Color="{StaticResource SuccessColor}"/>
   <Color x:Key="WarningColor">#8a5a00</Color>
   <SolidColorBrush x:Key="Warning" Color="{StaticResource WarningColor}"/>
-  <Color x:Key="OverlayBgColor">#16181d</Color>
+  <Color x:Key="OverlayBgColor">#b8fff1e6</Color>
   <SolidColorBrush x:Key="OverlayBg" Color="{StaticResource OverlayBgColor}"/>
-  <Color x:Key="OverlaySurfaceColor">#232730</Color>
+  <Color x:Key="OverlaySurfaceColor">#e6fff6ee</Color>
   <SolidColorBrush x:Key="OverlaySurface" Color="{StaticResource OverlaySurfaceColor}"/>
-  <Color x:Key="OverlayBorderColor">#6b7380</Color>
+  <Color x:Key="OverlayBorderColor">#ffffffff</Color>
   <SolidColorBrush x:Key="OverlayBorder" Color="{StaticResource OverlayBorderColor}"/>
-  <Color x:Key="OverlayTextColor">#f3f4f6</Color>
+  <Color x:Key="OverlayTextColor">#4a2410</Color>
   <SolidColorBrush x:Key="OverlayText" Color="{StaticResource OverlayTextColor}"/>
-  <Color x:Key="OverlayTextMutedColor">#a9b0bb</Color>
+  <Color x:Key="OverlayTextMutedColor">#7a4a30</Color>
   <SolidColorBrush x:Key="OverlayTextMuted" Color="{StaticResource OverlayTextMutedColor}"/>
-  <Color x:Key="OverlayAccentColor">#2dd4bf</Color>
+  <Color x:Key="OverlayAccentColor">#f08a3a</Color>
   <SolidColorBrush x:Key="OverlayAccent" Color="{StaticResource OverlayAccentColor}"/>
-  <Color x:Key="OnOverlayAccentColor">#04201c</Color>
+  <Color x:Key="OnOverlayAccentColor">#2b1204</Color>
   <SolidColorBrush x:Key="OnOverlayAccent" Color="{StaticResource OnOverlayAccentColor}"/>
   <CornerRadius x:Key="RadiusSm">6</CornerRadius>
   <CornerRadius x:Key="RadiusMd">10</CornerRadius>
@@ -57,7 +57,7 @@
   <Thickness x:Key="Space6">32</Thickness>
   <Thickness x:Key="Space7">48</Thickness>
   <sys:Double x:Key="WheelDiameter">360</sys:Double>
-  <sys:Double x:Key="WheelHole">96</sys:Double>
+  <sys:Double x:Key="WheelHole">112</sys:Double>
   <sys:Double x:Key="SlotMin">56</sys:Double>
   <sys:Double x:Key="SettingsWidth">560</sys:Double>
   <sys:Double x:Key="ToastWidth">320</sys:Double>

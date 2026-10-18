@@ -35,3 +35,6 @@ Self-test: 42 checks pass (2 redaction checks added plus a visual one).
 Installed ffmpeg (Gyan.FFmpeg) and ImageMagick 7.1.2 via winget. Added `EngineChecks` to the self-test: 3 ImageMagick outputs, 14 ffmpeg outputs, all pass; whole self-test passes. Checks confirm the output exists and is non-empty (WebP also checks its header, VTT its first line), not that it plays.
 **Bug found by installing the engines (S3, fixed):** with ImageMagick present, locked, missing and corrupt images fell back to magick and showed its raw error text instead of the clear message. The fallback now only runs for HEIC/HEIF/WebP/AVIF input.
 Still not run: pandoc, LibreOffice, Poppler, Ghostscript paths.
+
+## Wheel look pass (2026-10-18)
+S01 now a ring of 8 pie wedges with gaps, labels only, centre shows thumbnail (or file icon) and size, light translucent warm palette (own colours). More than 8 options collapse into groups. Screenshot: clone-screens/S01.png. Not yet seen live over Explorer.
