@@ -127,12 +127,9 @@ public static class SelfTest
             Check("two pdfs can merge", Registry.For(new[] { p1, p2 }, OpKind.Tool).Any(o => o.Id == "t.pdf.merge"));
             Check("actions work on any selection", Registry.For(new[] { folder }, OpKind.Action).Count >= 5);
 
-            Check("fresh install allows exactly 20 files", Db.Allows(20) && !Db.Allows(21));
-
             // ---- edge cases through the real job queue
             await EdgeCases(dir, png, folder);
 
-            Check("bad key rejected", !Db.TryUnlock("nope"));
 
             await EngineChecks(dir, png);
             await ToolChecks(dir, png);
@@ -411,14 +408,11 @@ public static class SelfTest
         vm = await Wait(() => running);
         Check("cancel ends as Cancelled and removes the placeholder", vm.State == JobState.Cancelled && !File.Exists(stem), vm.State.ToString());
 
-        // a job that fails does not use up the free allowance; one that succeeds does
-        long used = Db.FilesUsed;
-        JobRunner.Start(jpg, new[] { bad });
-        await Wait(Newest);
-        Check("failed job does not count", Db.FilesUsed == used);
-        JobRunner.Start(jpg, new[] { png });
-        await Wait(Newest);
-        Check("successful job counts once", Db.FilesUsed == used + 1, $"{used} -> {Db.FilesUsed}");
+        // there is no allowance: many files in a row all convert
+        for (int i = 0; i < 25; i++) JobRunner.Start(jpg, new[] { png });
+        await Task.Delay(500);
+        for (int i = 0; i < 100 && JobRunner.Jobs.Any(j => j.State is JobState.Queued or JobState.Running); i++) await Task.Delay(100);
+        Check("25 conversions in a row, no limit", Directory.GetFiles(dir, "pic*.jpg").Length >= 25, Directory.GetFiles(dir, "pic*.jpg").Length + " jpg files");
 
         // output folder setting
         var elsewhere = Directory.CreateDirectory(Path.Combine(dir, "elsewhere")).FullName;
@@ -436,14 +430,5 @@ public static class SelfTest
         vm = await Wait(Newest);
         Check("folder named my.folder zips to my.folder.zip", Path.GetFileName(vm.Output) == "my.folder.zip", vm.Output);
 
-        // limit: no job is created and the event fires
-        int jobsBefore = JobRunner.Jobs.Count; bool fired = false;
-        void H() => fired = true;
-        JobRunner.LimitReached += H;
-        Db.AddUsed(Db.FreeFiles - (int)Db.FilesUsed); // use up exactly what is left
-        JobRunner.Start(jpg, new[] { png });
-        JobRunner.LimitReached -= H;
-        Check("over the limit: paywall event, no job", fired && JobRunner.Jobs.Count == jobsBefore);
-        Check("actions still work over the limit", Registry.For(new[] { png }, OpKind.Action).Count > 0);
     }
 }

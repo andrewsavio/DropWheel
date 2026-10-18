@@ -9,7 +9,6 @@ namespace DropWheel;
 /// <summary>Local SQLite store: settings, job history, trial counter. Schema is replica/schema.sql.</summary>
 public static class Db
 {
-    public const int FreeFiles = 20;
     static SqliteConnection _c = null!;
     static readonly object _lock = new();
 
@@ -80,25 +79,6 @@ public static class Db
     public static void FinishJob(long id, string status, string? output, string? error) =>
         Exec("update jobs set status = $s, output_path = $o, error = $e, finished_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') where id = $i",
              ("$s", status), ("$o", (object?)output ?? DBNull.Value), ("$e", (object?)error ?? DBNull.Value), ("$i", id));
-
-    public static long FilesUsed => Scalar("select files_used from license where id = 1");
-    public static bool Unlocked => Scalar("select unlocked from license where id = 1") == 1;
-    public static void AddUsed(int n) => Exec("update license set files_used = files_used + $n where id = 1", ("$n", n));
-
-    /// <summary>Can <paramref name="files"/> more files be processed under the free allowance?</summary>
-    public static bool Allows(int files) => Unlocked || FilesUsed + files <= FreeFiles;
-
-    /// <summary>ponytail: no license server yet. Debug builds accept one dev key; release builds accept none until a vendor is wired in.</summary>
-    public static bool TryUnlock(string key)
-    {
-#if DEBUG
-        if (key.Trim() != "DEV-UNLOCK") return false;
-#else
-        return false;
-#endif
-        Exec("update license set unlocked = 1, key = $k where id = 1", ("$k", key.Trim()));
-        return true;
-    }
 }
 
 public static class Settings

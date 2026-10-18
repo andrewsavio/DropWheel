@@ -30,10 +30,3 @@ create table jobs (
 create index jobs_batch  on jobs(batch_id);
 create index jobs_status on jobs(status);
 
-create table license (
-  id         integer primary key check (id = 1),
-  files_used integer not null default 0,
-  unlocked   integer not null default 0,
-  key        text
-);
-insert into license(id) values (1);

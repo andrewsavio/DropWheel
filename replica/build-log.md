@@ -47,3 +47,6 @@ Built from the approved mockup: wedges inset and drawn with a 10 px round-joined
 ## "I love" tools pass (2026-10-18)
 Added Resize/enlarge, Compress to… (size or quality), Rotate, Images to PDF, video Resize and Compress to…, audio Compress to…, PDF Compress and PDF to JPG/PNG with the Windows renderer. Prompts are validated in the dialog before a job starts. Self-test 87/87 (outputs decoded with ffprobe and ImageMagick, not just size-checked). Live Ctrl-drag: Rotate, Resize (dialog answered through UI Automation) and Compress to… pass.
 **Harder than expected:** e2e runs use the real app database, so they used up the 20 free files and the next run hit the paywall instead of the dialog. Unlocked this machine (personal use). e2e should get its own data folder.
+
+## Trial removed (2026-10-18)
+Personal use, so the 20-file allowance, paywall window, license section in Settings and license table (new installs) are gone. Existing databases keep an unused license table. Self-test 82/82, live drag passes.

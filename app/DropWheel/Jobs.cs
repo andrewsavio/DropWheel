@@ -44,16 +44,14 @@ public static class JobRunner
     static readonly SemaphoreSlim Slots = new(Math.Max(2, Environment.ProcessorCount / 2));
 
     public static ObservableCollection<JobVM> Jobs { get; } = new();
-    /// <summary>Raised on the UI thread when something needs the user's attention (a new job, a failure, the paywall).</summary>
+    /// <summary>Raised on the UI thread when something needs the user's attention (a new job, a failure).</summary>
     public static event Action? Changed;
-    public static event Action? LimitReached;
     public static void RaiseChanged() => Changed?.Invoke();
 
-    /// <summary>Queue an operation over the selection. Actions run immediately and are never counted.</summary>
+    /// <summary>Queue an operation over the selection. Actions run immediately.</summary>
     public static void Start(Op op, IReadOnlyList<string> paths)
     {
         if (op.Kind == OpKind.Action) { _ = RunAction(op, paths); return; }
-        if (!Db.Allows(paths.Count)) { LimitReached?.Invoke(); return; }
         if (op.Prompt != null && op.RunWith != null)
         {
             var answer = InputDialog.Ask(op.Label, op.Prompt, op.Check);
@@ -88,7 +86,6 @@ public static class JobRunner
                 id = Db.NewJob(batch, op.Kind, op.Id, source.Replace('\n', ';'), counted: true);
                 await op.Run(source, dst, p => { vm.Progress = p; vm.Message = p >= 0 ? $"{p:P0}" : "Working"; }, vm.Cts.Token);
                 Db.FinishJob(id, "done", dst, null);
-                Db.AddUsed(files);
                 vm.Output = dst; vm.Progress = 1; vm.Message = "Done"; vm.State = JobState.Done;
                 _ = AutoDismiss(vm, 12);
             }

@@ -24,7 +24,7 @@ Menu bar app,core,should,yes,yes,"tray icon, pause, settings, quit"
 Rebindable modifiers (Settings),core,should,yes,yes,"Shift/Ctrl/Alt per mode, conflicts swap"
 Touch drag/hold,core,could,yes,no,not built or tested
 Local-only processing,privacy,must,yes,yes,no network code
-Free 20 files then paid unlock,business,could,yes,skip,"own pricing decision; counter + paywall built and tested, no license vendor yet"
+Free 20 files then paid unlock,business,could,yes,skip,personal use: trial and paywall removed from the code
 Document redaction (offline),tools,must,yes,yes,"PDF only: words you name are blacked out and pages rewritten as images (text layer gone, self-test proves it); no regex, no rotation, no DOCX; prompt dialog not seen by hand"
 Command-context in-place tools (bitrate slider / redact menu),tools,should,yes,yes,"tools ask one checked question (size, target, strength, words) before running; text box, not sliders"
 Smart MIME-based format recommendations,core,should,yes,partial,options filtered by type; no ranking of likely targets

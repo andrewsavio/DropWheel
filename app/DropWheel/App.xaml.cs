@@ -36,7 +36,6 @@ public partial class App : Application
         Db.Open();
         Settings.Reload();
         _toast = new ToastWindow();
-        JobRunner.LimitReached += () => Dispatcher.BeginInvoke(() => new PaywallWindow().Show());
 
         _hook = new InputHook { KeyFor = Settings.KeyFor };
         _hook.DragStarted += (start, root) => _pending = ShellSelection.ForDragAsync(root, start);

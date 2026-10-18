@@ -28,8 +28,6 @@ public partial class SettingsWindow : Window
 
     void Refresh()
     {
-        LicenseText.Text = Db.Unlocked ? "Unlocked. Thank you."
-            : $"{Db.FilesUsed} of {Db.FreeFiles} free files used.";
         Engines.Refresh();
         var missing = Registry.Missing();
         EngineText.Text = missing.Count == 0
