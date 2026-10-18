@@ -8,6 +8,31 @@
 | Layout parity | **not measured** (see below) |
 | Open bugs | none at S1 or S2; 3 at S3 (`replica/bugs.md`) |
 
+## Update: scored against the Tangerine PRD (v1.0, Q4 2026)
+Source: `Tangerine_Mac_PRD.pdf`, 4 pages. Five rows added to `features.csv` (prior copy: `features.prev.csv`).
+
+**Feature parity: 59.4 / 100** (was 65.5). Must-haves done: 3 of 7. **Verdict: not shippable.**
+The score fell because the PRD names things the earlier recon had not weighted:
+
+| PRD requirement | clone | gap |
+| --- | --- | --- |
+| Document redaction, offline (Enterprise/Legal persona driver) | none | **new must-have, not built** |
+| Command context: in-place tools (bitrate sliders, redact menus) | fixed presets only (JPG q72, CRF 28, MP3 96k) | no parameter UI |
+| Smart format suggestions by MIME type | filtered by type, not ranked | partial |
+| Scale: 249 formats / 26 tools / 6 actions | about 29 conversions registered, 11 tools, 6 actions (5 of the PRD's 6; AirDrop missing) | formats and tools far below |
+| Zero network capability | no network code in source | **met** (nothing to check at entitlement level) |
+| Sandbox, Apple Silicon / Neural Engine, MAS parity, $29.99 | not applicable or not packaged | Windows equivalents: MSIX, skip, skip |
+| One-time price | 20-file counter and paywall, no vendor | decision still open |
+
+Caveat: the PRD gives no screens, so layout parity is still unmeasured, and its "249 / 26 / 6" counts are marketing totals I cannot map row by row. The recon quoted 275 conversions for the same site, so the PRD and the site disagree; do not treat either as a precise target.
+
+### Top five to build next (PRD-weighted)
+1. Run the engines for real (ffmpeg, ImageMagick): moves 3 must-haves from partial to done.
+2. Offline PDF redaction with a small parameter UI (the missing must-have).
+3. Reuse that parameter UI for the Command-context tools: bitrate slider, compress target size, crop/trim.
+4. Rank format suggestions by input type (most likely target first).
+5. Mixed-type batches, then MSIX packaging and a license vendor.
+
 ## What the one reference image shows (S01, the conversion wheel)
 Source: the AVIF screenshot you added to Downloads (273x210 px, a small marketing graphic with a caption: "I hold shift, then drag the file"). Observed:
 - The wheel is a **ring of 8 pie-wedge segments** that fill the ring with thin gaps, labels only (JPG, WEBP, HEIC, TIFF, AVIF, BMP, PDF, DOCX). Mine is a ring of 4 to 12 separate rounded tiles on a dark disc.

@@ -20,6 +20,8 @@ public sealed record Op(
     public bool IsFolderOut { get; init; } // output is a directory of files (e.g. one image per PDF page)
     public bool Batch { get; init; }       // consumes all selected files at once (merge, zip); source arrives newline-joined
     public bool SameExt { get; init; }     // output keeps the source extension
+    public string? Prompt { get; init; }   // ask the user for one value first (a word to redact); null = no question
+    public Func<string, string, string, Action<double>, CancellationToken, Task>? RunWith { get; init; } // like Run, plus the answer
     public int MinFiles { get; init; } = 1;
     public string Suffix { get; init; } = ""; // appended to the output name: "photo-compressed.jpg"
 }

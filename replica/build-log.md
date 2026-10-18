@@ -22,3 +22,11 @@ Stack changed from Electron to C# / WPF on .NET 10 (your choice: "Windows native
 - Output names are reserved on disk before the job runs, so parallel jobs can't collide (found and fixed by the self-test).
 - Not verified: the real drag over Explorer and the desktop, Explorer tabs, touch, mixed-DPI placement, admin windows (the hook cannot see them), every ffmpeg/pandoc/LibreOffice/ImageMagick path (those engines are not installed on this machine).
 - Self-test: `DropWheel.exe --selftest log.txt [--shot wheel.png]`, 25 checks, all pass. Engines found: 7-Zip only.
+
+## PRD gap pass (2026-10-18)
+| item | status | note |
+| --- | --- | --- |
+| PDF redaction | done (self-test) | Windows.Data.Pdf draws pages, PdfPig finds words, black boxes painted into pixels, pages rewritten as JPEG so text is truly gone. Needed the TFM change to net10.0-windows10.0.19041.0. Refuses when nothing matches. Scanned PDFs have no text to search. |
+| parameter prompt | partial | `Op.Prompt` + `InputDialog`; redact only |
+| engines (ffmpeg, ImageMagick) | not done | needs downloads/installs on this machine; asked the user instead |
+Self-test: 42 checks pass (2 redaction checks added plus a visual one).

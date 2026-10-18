@@ -94,6 +94,27 @@ public static class SelfTest
             using (var s = PdfDocument.Open(stripped)) Check("strip pdf author", string.IsNullOrEmpty(s.Information.Author), "author='" + s.Information.Author + "'");
             using (var s = PdfDocument.Open(p1)) Check("test pdf really had an author", s.Information.Author == "someone");
 
+            // redaction
+            var rb = new PdfDocumentBuilder();
+            rb.AddPage(UglyToad.PdfPig.Content.PageSize.A4).AddText("Client Acme owes 500 dollars", 14,
+                new UglyToad.PdfPig.Core.PdfPoint(50, 700), rb.AddStandard14Font(UglyToad.PdfPig.Fonts.Standard14Fonts.Standard14Font.Helvetica));
+            var rsrc = Path.Combine(dir, "secret.pdf"); File.WriteAllBytes(rsrc, rb.Build());
+            var rdst = Output.Reserve(Registry.All().First(o => o.Id == "t.pdf.redact"), rsrc);
+            await Registry.PdfRedact(rsrc, rdst, "Acme", _ => { }, default);
+            using (var r = PdfDocument.Open(rdst))
+                Check("redacted pdf has no text", r.NumberOfPages == 1 && r.GetPage(1).Text.Length == 0, "text='" + r.GetPage(1).Text + "'");
+            using (var r = PdfDocument.Open(rdst))
+            {
+                var im = r.GetPage(1).GetImages().Single();
+                var bmp = BitmapDecoder.Create(new MemoryStream(im.RawBytes.ToArray()), BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
+                var px = new byte[bmp.PixelWidth * bmp.PixelHeight * 3];
+                new System.Windows.Media.Imaging.FormatConvertedBitmap(bmp, System.Windows.Media.PixelFormats.Bgr24, null, 0).CopyPixels(px, bmp.PixelWidth * 3, 0);
+                int dark = 0, light = 0; for (int i = 0; i < px.Length; i += 3) { if (px[i] < 30) dark++; else if (px[i] > 225) light++; }
+                Check("redacted page keeps its look and has a black box", light > px.Length / 6 && dark > 200, $"dark {dark}, light {light}");
+            }
+            try { await Registry.PdfRedact(rsrc, rdst, "zzz", _ => { }, default); Check("redact with no match refuses", false); }
+            catch (InvalidOperationException) { Check("redact with no match refuses", true); }
+
             // subtitles
             var srt = Path.Combine(dir, "s.srt");
             File.WriteAllText(srt, "1\n00:00:01,000 --> 00:00:02,000\n<i>Hello</i>\n\n2\n00:00:03,000 --> 00:00:04,000\nWorld\n");

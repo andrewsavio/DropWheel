@@ -140,6 +140,9 @@ public static class Registry
             (s, d, p, ct) => Task.Run(() => PdfSplit(s, d, p, ct), ct)) { IsFolderOut = true, Suffix = " (split)" });
         ops.Add(new Op("t.pdf.merge", OpKind.Tool, "Merge", "PDF", "Join PDFs in the order selected", In("pdf"), "pdf",
             (s, d, p, ct) => Task.Run(() => PdfMerge(s.Split('\n'), d), ct)) { Batch = true, MinFiles = 2, Suffix = "-merged" });
+        ops.Add(new Op("t.pdf.redact", OpKind.Tool, "Redact", "PDF", "Black out words you name; pages become images", In("pdf"), "pdf",
+            (s, d, p, ct) => Task.CompletedTask) { Suffix = "-redacted", Prompt = "Words or phrases to black out, separated by commas.",
+            RunWith = (s, d, terms, p, ct) => PdfRedact(s, d, terms, p, ct) });
         ops.Add(new Op("t.zip", OpKind.Tool, "Zip", "Archive", "Put the selection in one ZIP", p => true, "zip",
             (s, d, p, ct) => Task.Run(() => ZipPaths(s.Split('\n'), d), ct)) { Batch = true });
         ops.Add(new Op("t.unpack", OpKind.Tool, "Unpack", "Archive", "Extract into a folder", In(archIn), "",
@@ -276,6 +279,69 @@ public static class Registry
                 PdfMerger.Merge(new List<byte[]> { bytes }, new List<IReadOnlyList<int>> { new[] { i } }));
             progress((double)i / pages);
         }
+    }
+
+    /// <summary>
+    /// Real redaction: each page is drawn to pixels, the matching words are painted black in the pixels, and the
+    /// pages are written back as images, so the hidden text no longer exists in the file. (Windows.Data.Pdf draws
+    /// the page, PdfPig finds the words.) ponytail: matches word runs, ignores page rotation; add regex and
+    /// rotation if a customer needs them.
+    /// </summary>
+    public static async Task PdfRedact(string src, string dst, string terms, Action<double> progress, CancellationToken ct)
+    {
+        const double Scale = 2; // 144 dpi
+        var wanted = terms.Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(t => t.Split(' ', StringSplitOptions.RemoveEmptyEntries)).Where(t => t.Length > 0).ToList();
+        var file = await Windows.Storage.StorageFile.GetFileFromPathAsync(Path.GetFullPath(src));
+        var render = await Windows.Data.Pdf.PdfDocument.LoadFromFileAsync(file);
+        var builder = new PdfDocumentBuilder();
+        int hits = 0;
+        using var doc = UglyToad.PdfPig.PdfDocument.Open(File.ReadAllBytes(src));
+        for (int n = 1; n <= doc.NumberOfPages; n++)
+        {
+            ct.ThrowIfCancellationRequested();
+            var page = doc.GetPage(n);
+            var words = page.GetWords().ToList();
+            var boxes = new List<(double l, double t, double r, double b)>(); // PDF points, origin top-left
+            foreach (var term in wanted)
+                for (int i = 0; i + term.Length <= words.Count; i++)
+                {
+                    bool match = true;
+                    for (int k = 0; k < term.Length && match; k++)
+                        match = words[i + k].Text.Trim('.', ',', ';', ':', '!', '?', '(', ')', '"').Equals(term[k], StringComparison.OrdinalIgnoreCase);
+                    if (!match) continue;
+                    hits++;
+                    for (int k = 0; k < term.Length; k++)
+                    {
+                        var r = words[i + k].BoundingBox;
+                        boxes.Add((r.Left - 1, page.Height - r.Top - 1, r.Right + 1, page.Height - r.Bottom + 1));
+                    }
+                }
+
+            using var rp = render.GetPage((uint)(n - 1));
+            using var ms = new Windows.Storage.Streams.InMemoryRandomAccessStream();
+            await rp.RenderToStreamAsync(ms, new Windows.Data.Pdf.PdfPageRenderOptions { DestinationWidth = (uint)Math.Round(page.Width * Scale) });
+            ms.Seek(0);
+            var frame = BitmapDecoder.Create(ms.AsStreamForRead(), BitmapCreateOptions.None, BitmapCacheOption.OnLoad).Frames[0];
+            var rgb = new FormatConvertedBitmap(frame, PixelFormats.Bgr24, null, 0);
+            int w = rgb.PixelWidth, h = rgb.PixelHeight, stride = w * 3;
+            var px = new byte[stride * h];
+            rgb.CopyPixels(px, stride, 0);
+            double sx = w / page.Width, sy = h / page.Height;
+            foreach (var (l, t, r, b) in boxes)
+            {
+                int x0 = Math.Max(0, (int)(l * sx)), x1 = Math.Min(w, (int)Math.Ceiling(r * sx));
+                for (int y = Math.Max(0, (int)(t * sy)); y < Math.Min(h, (int)Math.Ceiling(b * sy)); y++)
+                    if (x1 > x0) Array.Clear(px, y * stride + x0 * 3, (x1 - x0) * 3);
+            }
+            var enc = new JpegBitmapEncoder { QualityLevel = 88 };
+            enc.Frames.Add(BitmapFrame.Create(BitmapSource.Create(w, h, 96, 96, PixelFormats.Bgr24, null, px, stride)));
+            using var jpg = new MemoryStream(); enc.Save(jpg);
+            builder.AddPage(page.Width, page.Height).AddJpeg(jpg.ToArray(), new UglyToad.PdfPig.Core.PdfRectangle(0, 0, page.Width, page.Height));
+            progress((double)n / doc.NumberOfPages);
+        }
+        if (hits == 0) throw new InvalidOperationException("None of those words were found, so nothing was redacted. Scanned pages have no text to search.");
+        File.WriteAllBytes(dst, builder.Build());
     }
 
     static void PdfStrip(string src, string dst) =>

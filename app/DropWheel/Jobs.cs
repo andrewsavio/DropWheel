@@ -54,6 +54,13 @@ public static class JobRunner
     {
         if (op.Kind == OpKind.Action) { _ = RunAction(op, paths); return; }
         if (!Db.Allows(paths.Count)) { LimitReached?.Invoke(); return; }
+        if (op.Prompt != null && op.RunWith != null)
+        {
+            var answer = InputDialog.Ask(op.Label, op.Prompt);
+            if (string.IsNullOrWhiteSpace(answer)) return;
+            var with = op.RunWith;
+            op = op with { Run = (s, d, p, ct) => with(s, d, answer, p, ct) };
+        }
 
         var batch = Db.NewBatch();
         var units = op.Batch ? new List<string> { string.Join('\n', paths) } : paths.ToList();
