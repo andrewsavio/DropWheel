@@ -153,7 +153,7 @@ public partial class WheelWindow : Window
     /// <summary>One pie wedge of the ring, centred on angle mid with half-width half. Its label sits on top and ignores the mouse, so the wedge is the drop target.</summary>
     System.Windows.Shapes.Path MakeSlot(string label, string tip, Action<IReadOnlyList<string>> run, bool isGroup, double mid, double half)
     {
-        double c = Ring.Width / 2, gap = 0.035; // radians of empty space between wedges
+        double c = Ring.Width / 2, gap = 0.02; // radians of empty space between wedges
         double w = Math.Max(0.05, half - gap);
         Point P(double r, double a) => new(c + r * Math.Cos(a), c + r * Math.Sin(a));
         var g = new StreamGeometry();
@@ -168,13 +168,13 @@ public partial class WheelWindow : Window
         g.Freeze();
         var slot = new System.Windows.Shapes.Path
         {
-            Data = g, StrokeThickness = 1, Fill = Res("OverlaySurface"), Stroke = Res("OverlayBorder"), StrokeLineJoin = PenLineJoin.Round,
+            Data = g, StrokeThickness = 0, Fill = Res("OverlaySurface"), Stroke = Res("OverlayBorder"), StrokeLineJoin = PenLineJoin.Round,
             AllowDrop = true, Focusable = true, ToolTip = tip, FocusVisualStyle = null, Cursor = Cursors.Hand,
         };
         Ring.Children.Add(slot); // before the label, so the label draws on top
         var text = new TextBlock
         {
-            Text = label, FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Center, IsHitTestVisible = false,
+            Text = label, FontWeight = FontWeights.Medium, FontSize = 13, TextAlignment = TextAlignment.Center, IsHitTestVisible = false,
             Width = 90, Foreground = Res("OverlayText"),
         };
         text.Measure(new Size(90, 40));

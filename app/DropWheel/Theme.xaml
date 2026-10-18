@@ -24,19 +24,19 @@
   <SolidColorBrush x:Key="Success" Color="{StaticResource SuccessColor}"/>
   <Color x:Key="WarningColor">#8a5a00</Color>
   <SolidColorBrush x:Key="Warning" Color="{StaticResource WarningColor}"/>
-  <Color x:Key="OverlayBgColor">#b8fff1e6</Color>
+  <Color x:Key="OverlayBgColor">#00ffffff</Color>
   <SolidColorBrush x:Key="OverlayBg" Color="{StaticResource OverlayBgColor}"/>
-  <Color x:Key="OverlaySurfaceColor">#e6fff6ee</Color>
+  <Color x:Key="OverlaySurfaceColor">#8cffffff</Color>
   <SolidColorBrush x:Key="OverlaySurface" Color="{StaticResource OverlaySurfaceColor}"/>
-  <Color x:Key="OverlayBorderColor">#ffffffff</Color>
+  <Color x:Key="OverlayBorderColor">#00ffffff</Color>
   <SolidColorBrush x:Key="OverlayBorder" Color="{StaticResource OverlayBorderColor}"/>
-  <Color x:Key="OverlayTextColor">#4a2410</Color>
+  <Color x:Key="OverlayTextColor">#4a2a18</Color>
   <SolidColorBrush x:Key="OverlayText" Color="{StaticResource OverlayTextColor}"/>
-  <Color x:Key="OverlayTextMutedColor">#7a4a30</Color>
+  <Color x:Key="OverlayTextMutedColor">#6b4a3a</Color>
   <SolidColorBrush x:Key="OverlayTextMuted" Color="{StaticResource OverlayTextMutedColor}"/>
-  <Color x:Key="OverlayAccentColor">#f08a3a</Color>
+  <Color x:Key="OverlayAccentColor">#e8ffffff</Color>
   <SolidColorBrush x:Key="OverlayAccent" Color="{StaticResource OverlayAccentColor}"/>
-  <Color x:Key="OnOverlayAccentColor">#2b1204</Color>
+  <Color x:Key="OnOverlayAccentColor">#3b1d0c</Color>
   <SolidColorBrush x:Key="OnOverlayAccent" Color="{StaticResource OnOverlayAccentColor}"/>
   <CornerRadius x:Key="RadiusSm">6</CornerRadius>
   <CornerRadius x:Key="RadiusMd">10</CornerRadius>
