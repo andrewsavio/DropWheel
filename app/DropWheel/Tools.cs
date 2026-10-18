@@ -245,30 +245,5 @@ public static class Tools
         }
     }
 
-    public static (int dpi, int quality)? PdfLevel(string a) => a.Trim().ToLowerInvariant() switch
-    {
-        "low" or "light" or "less" => (150, 75),
-        "medium" or "recommended" or "" => (120, 60),
-        "high" or "strong" or "extreme" or "more" => (90, 45),
-        _ => null,
-    };
-    public static string? CheckPdfLevel(string a) => PdfLevel(a) == null ? "Type low, medium or strong." : null;
 
-    /// <summary>Redraws every page as a JPG. Much smaller for scans and photos; text stops being selectable.</summary>
-    public static async Task PdfShrink(string src, string dst, (int dpi, int quality) level, Action<double> progress, CancellationToken ct)
-    {
-        var doc = await OpenPdf(src);
-        var pdf = new PdfDocumentBuilder();
-        for (uint i = 0; i < doc.PageCount; i++)
-        {
-            ct.ThrowIfCancellationRequested();
-            double w, h;
-            using (var p = doc.GetPage(i)) { w = p.Size.Width * 0.75; h = p.Size.Height * 0.75; } // DIPs to points
-            pdf.AddPage(w, h).AddJpeg(Encode(await RenderPage(doc, i, level.dpi), "jpg", level.quality), new UglyToad.PdfPig.Core.PdfRectangle(0, 0, w, h));
-            progress((i + 1.0) / doc.PageCount);
-        }
-        File.WriteAllBytes(dst, pdf.Build());
-        if (new FileInfo(dst).Length >= new FileInfo(src).Length)
-            throw new InvalidOperationException("This PDF is already small; shrinking it would make it bigger. Nothing was changed.");
-    }
 }

@@ -22,6 +22,8 @@ public sealed record Op(
     public bool SameExt { get; init; }     // output keeps the source extension
     public string? Prompt { get; init; }   // ask the user for one value first (a word to redact); null = no question
     public Func<string, string, string, Action<double>, CancellationToken, Task>? RunWith { get; init; } // like Run, plus the answer
+    public bool Secret { get; init; }      // prompt is a password: masked, never logged
+    public bool AllowBlank { get; init; }  // an empty answer is valid (e.g. a PDF that opens without a password)
     public Func<string, string?>? Check { get; init; } // returns an error message for a bad answer, shown in the prompt
     public int MinFiles { get; init; } = 1;
     public string Suffix { get; init; } = ""; // appended to the output name: "photo-compressed.jpg"
@@ -60,7 +62,7 @@ public static class Engines
     public static void Refresh() { lock (Cache) Cache.Clear(); }
 
     /// <summary>Runs an engine, feeding each stderr/stdout line to onLine. Throws with the tail of its output on failure.</summary>
-    public static async Task Run(string exe, IEnumerable<string> args, CancellationToken ct, Action<string>? onLine = null, string? workDir = null)
+    public static async Task Run(string exe, IEnumerable<string> args, CancellationToken ct, Action<string>? onLine = null, string? workDir = null, int[]? ok = null)
     {
         var path = Find(exe) ?? throw new InvalidOperationException($"{exe} is not installed");
         var psi = new ProcessStartInfo(path)
@@ -85,7 +87,7 @@ public static class Engines
         using var reg = ct.Register(() => { try { p.Kill(entireProcessTree: true); } catch { } });
         await p.WaitForExitAsync(CancellationToken.None);
         ct.ThrowIfCancellationRequested();
-        if (p.ExitCode != 0)
+        if (!(ok ?? new[] { 0 }).Contains(p.ExitCode))
             throw new InvalidOperationException($"{exe} failed ({p.ExitCode}): {string.Join(" | ", tail.Where(s => s.Length > 0))}");
     }
 }

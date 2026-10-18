@@ -6,16 +6,20 @@ namespace DropWheel;
 /// <summary>One-question box for tools that need a value. Returns null on cancel.</summary>
 public static class InputDialog
 {
-    public static string? Ask(string title, string question, System.Func<string, string?>? check = null)
+    public static string? Ask(string title, string question, System.Func<string, string?>? check = null, bool secret = false, bool allowBlank = false)
     {
         string? result = null;
         Application.Current.Dispatcher.Invoke(() =>
         {
-            var box = new TextBox { Margin = new Thickness(0, 8, 0, 4), MinWidth = 320 };
+            var text = new TextBox { Margin = new Thickness(0, 8, 0, 4), MinWidth = 320 };
+            var pass = new PasswordBox { Margin = new Thickness(0, 8, 0, 4), MinWidth = 320 };
+            Control box = secret ? pass : text;
+            string Value() => secret ? pass.Password : text.Text;
             var error = new TextBlock { Foreground = System.Windows.Media.Brushes.Firebrick, TextWrapping = TextWrapping.Wrap, MaxWidth = 320, Margin = new Thickness(0, 0, 0, 8) };
             System.Windows.Automation.AutomationProperties.SetName(box, question);
             System.Windows.Automation.AutomationProperties.SetLiveSetting(error, System.Windows.Automation.AutomationLiveSetting.Assertive);
-            box.TextChanged += (_, _) => error.Text = "";
+            text.TextChanged += (_, _) => error.Text = "";
+            pass.PasswordChanged += (_, _) => error.Text = "";
             var ok = new Button { Content = "OK", IsDefault = true, Width = 80, Margin = new Thickness(0, 0, 8, 0) };
             var no = new Button { Content = "Cancel", IsCancel = true, Width = 80 };
             var row = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Children = { ok, no } };
@@ -27,9 +31,9 @@ public static class InputDialog
             };
             ok.Click += (_, _) =>
             {
-                var problem = string.IsNullOrWhiteSpace(box.Text) ? "Type a value first." : check?.Invoke(box.Text);
+                var problem = string.IsNullOrWhiteSpace(Value()) && !allowBlank ? "Type a value first." : string.IsNullOrEmpty(Value()) ? null : check?.Invoke(Value());
                 if (problem != null) { error.Text = problem; box.Focus(); return; }
-                result = box.Text; w.Close();
+                result = Value(); w.Close();
             };
             w.Loaded += (_, _) => box.Focus();
             w.ShowDialog();

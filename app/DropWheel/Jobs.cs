@@ -54,8 +54,8 @@ public static class JobRunner
         if (op.Kind == OpKind.Action) { _ = RunAction(op, paths); return; }
         if (op.Prompt != null && op.RunWith != null)
         {
-            var answer = InputDialog.Ask(op.Label, op.Prompt, op.Check);
-            if (string.IsNullOrWhiteSpace(answer)) return;
+            var answer = InputDialog.Ask(op.Label, op.Prompt, op.Check, op.Secret, op.AllowBlank);
+            if (answer == null) return; // cancelled
             var with = op.RunWith;
             op = op with { Run = (s, d, p, ct) => with(s, d, answer, p, ct) };
         }

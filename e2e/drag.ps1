@@ -7,7 +7,8 @@ param(
   [int]$SlotIndex = 0,        # 0 = top slot of the wheel, clockwise
   [int]$Slots = 8,
   [int]$Group = -1,           # hover this group wedge first (0 = top), then drop on SlotIndex inside it
-  [int]$Groups = 4,           # how many wedges the top level shows            # how many slots this file type shows
+  [int]$Groups = 4,           # how many wedges the top level shows
+  [ValidateSet("png", "pdf")][string]$Make = "png", # the test file to drag: pic.png, or a 3-page pic.pdf            # how many slots this file type shows
   [string]$Expect = "pic.jpg",
   [string]$ExpectClipboard = "",   # for actions that copy text instead of writing a file
   [ValidateSet("drop", "nokey", "cancel", "marquee", "still")][string]$Scenario = "drop"
@@ -75,6 +76,10 @@ Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory $dir | Out-Null
 $bmp = New-Object System.Drawing.Bitmap 64, 48
 $g = [System.Drawing.Graphics]::FromImage($bmp); $g.Clear([System.Drawing.Color]::Teal); $bmp.Save("$dir\pic.png"); $bmp.Dispose()
+if ($Make -eq "pdf") {
+  $magick = Get-ChildItem "$PSScriptRoot\..\app\DropWheel\engines\imagemagick\magick.exe" | Select-Object -First 1
+  & $magick.FullName "$dir\pic.png" "$dir\pic.png" "$dir\pic.png" "$dir\pic.pdf"; Remove-Item "$dir\pic.png"
+}
 
 Get-Process DropWheel -ErrorAction SilentlyContinue | Stop-Process -Force
 $app = Start-Process $Exe -PassThru
@@ -121,7 +126,7 @@ if ($Scenario -in "nokey", "marquee") {
   $seen = [bool]$wheel
   [W]::mouse_event(0x4, 0, 0, 0, [IntPtr]::Zero); [W]::keybd_event($vk, 0, 2, [IntPtr]::Zero)
   Start-Sleep 2
-  $extra = (Get-ChildItem $dir -File | Where-Object Name -ne "pic.png")
+  $extra = (Get-ChildItem $dir -File | Where-Object Name -notlike "pic.*")
   Cleanup
   if ($seen) { Fail "wheel appeared but should not have ($Scenario)" }
   if ($extra) { Fail "unexpected output: $(& $files)" }
@@ -160,7 +165,7 @@ Step "released ($Scenario)"
 
 if ($Scenario -eq "cancel") {
   Start-Sleep 3
-  $gone = -not (FindWheel); $extra = (Get-ChildItem $dir -File | Where-Object Name -ne "pic.png")
+  $gone = -not (FindWheel); $extra = (Get-ChildItem $dir -File | Where-Object Name -notlike "pic.*")
   Shot "drag-cancel-after"; Cleanup
   if (-not $gone) { Fail "wheel still open 3s after release elsewhere" }
   if ($extra) { Fail "cancel still produced output: $(& $files)" }

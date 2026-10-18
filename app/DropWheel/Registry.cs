@@ -110,12 +110,13 @@ public static class Registry
         }
         // ---- PDF out
         foreach (var o in new[] { "jpg", "png" })
-            ops.Add(new Op("pdf>" + o, OpKind.Convert, Up(o), "PDF", $"One {Up(o)} per page", In("pdf"), "",
-                (s, d, p, ct) => poppler ? PdfToImages(s, d, o, ct) : Tools.PdfToImages(s, d, o, p, ct)) { IsFolderOut = true, Suffix = " (pages)" });
-        ops.Add(new Op("pdf>txt", OpKind.Convert, "TXT", "PDF", "Extract text", In("pdf"), "txt",
-            (s, d, p, ct) => Engines.Run("pdftotext", new[] { "-layout", s, d }, ct), Engines.Has("pdftotext"), "Poppler"));
-        ops.Add(new Op("pdf>md", OpKind.Convert, "MD", "PDF", "Extract text as Markdown (layout not kept)", In("pdf"), "md",
-            (s, d, p, ct) => Engines.Run("pdftotext", new[] { s, d }, ct), Engines.Has("pdftotext"), "Poppler"));
+            ops.Add(new Op("pdf>" + o, OpKind.Convert, Up(o), "PDF", $"One {Up(o)} per page, 200 dpi", In("pdf"), "",
+                (s, d, p, ct) => gs ? PdfTools.ToImages(s, d, o, ct) : Tools.PdfToImages(s, d, o, p, ct)) { IsFolderOut = true, Suffix = " (pages)" });
+        ops.Add(new Op("pdf>txt", OpKind.Convert, "TXT", "PDF", "Text in reading order", In("pdf"), "txt", (s, d, p, ct) => PdfTools.ToText(s, d, false, ct)));
+        ops.Add(new Op("pdf>md", OpKind.Convert, "MD", "PDF", "Text as Markdown, a heading per page", In("pdf"), "md", (s, d, p, ct) => PdfTools.ToText(s, d, true, ct)));
+        ops.Add(new Op("pdf>pdfa", OpKind.Convert, "PDF/A", "PDF", "Archive format (PDF/A-2b)", In("pdf"), "pdf", (s, d, p, ct) => PdfTools.ToPdfA(s, d, ct), gs, "Ghostscript") { Suffix = "-pdfa" });
+        ops.Add(new Op("pdf>images", OpKind.Convert, "Images", "PDF", "Every picture inside, unchanged", In("pdf"), "", (s, d, p, ct) => PdfTools.ExtractImages(s, d, p, ct)) { IsFolderOut = true, Suffix = " (images)" });
+        ops.Add(new Op("html>pdf", OpKind.Convert, "PDF", "Web page", "Print the page to PDF", In(ImageTools.HtmlIn), "pdf", (s, d, p, ct) => PdfTools.HtmlToPdf(s, d, ct), Engines.Has("msedge"), "Microsoft Edge"));
         ops.Add(new Op("pdf>docx", OpKind.Convert, "DOCX", "PDF", "Best effort: layout may shift", In("pdf"), "docx",
             (s, d, p, ct) => Soffice(s, d, "docx:MS Word 2007 XML", "writer_pdf_import", ct), soffice, "LibreOffice"));
         ops.Add(new Op("pdf>epub", OpKind.Convert, "EPUB", "PDF", "Best effort: layout is lost", In("pdf"), "epub",
@@ -141,16 +142,6 @@ public static class Registry
             ffmpeg, "ffmpeg") { Suffix = "-compressed" });
         ops.Add(new Op("t.aud.compress", OpKind.Tool, "Compress", "Audio", "Smaller MP3 (96 kbps)", In(AudioIn), "mp3",
             (s, d, p, ct) => Ffmpeg(s, d, new[] { "-vn", "-c:a", "libmp3lame", "-b:a", "96k" }, p, ct), ffmpeg, "ffmpeg") { Suffix = "-compressed" });
-        ops.Add(new Op("t.pdf.compress", OpKind.Tool, "Compress", "PDF", "Smaller PDF (Ghostscript)", In("pdf"), "pdf",
-            (s, d, p, ct) => Engines.Run(Engines.Has("gswin64c") ? "gswin64c" : "gswin32c",
-                new[] { "-sDEVICE=pdfwrite", "-dPDFSETTINGS=/ebook", "-dNOPAUSE", "-dBATCH", "-dQUIET", "-sOutputFile=" + d, s }, ct),
-            gs, "Ghostscript") { Suffix = "-compressed" });
-        ops.Add(new Op("t.pdf.strip", OpKind.Tool, "Strip metadata", "PDF", "Clear title, author, subject, keywords", In("pdf"), "pdf",
-            (s, d, p, ct) => Task.Run(() => PdfStrip(s, d), ct)) { Suffix = "-clean" });
-        ops.Add(new Op("t.pdf.split", OpKind.Tool, "Split pages", "PDF", "One PDF per page", In("pdf"), "",
-            (s, d, p, ct) => Task.Run(() => PdfSplit(s, d, p, ct), ct)) { IsFolderOut = true, Suffix = " (split)" });
-        ops.Add(new Op("t.pdf.merge", OpKind.Tool, "Merge", "PDF", "Join PDFs in the order selected", In("pdf"), "pdf",
-            (s, d, p, ct) => Task.Run(() => PdfMerge(s.Split('\n'), d), ct)) { Batch = true, MinFiles = 2, Suffix = "-merged" });
         // ---- "I love" style tools: each asks one question, checked before the job starts
         var sizable = magick ? ImgIn : new[] { "jpg", "jpeg", "png", "bmp", "tif", "tiff", "gif" };
         ops.Add(new Op("t.img.resize", OpKind.Tool, "Resize", "Edit", "Exact size, width, height or percent; enlarges too", In(sizable), "", NoRun)
@@ -178,12 +169,39 @@ public static class Registry
         ops.Add(new Op("t.aud.target", OpKind.Tool, "Compress to…", "Audio", "MP3 close to the file size you choose", In(AudioIn), "mp3", NoRun, ffmpeg, "ffmpeg")
         { Suffix = "-compressed", Prompt = "Target file size, like 3 MB.", Check = Sizes.CheckBytes,
           RunWith = async (s, d, a, p, ct) => await Ffmpeg(s, d, await Tools.AudioForSize(s, Sizes.Target(a)!.Value.bytes!.Value, ct), p, ct) });
-        ops.Add(new Op("t.pdf.shrink", OpKind.Tool, "Compress", "PDF", "Smaller PDF; pages become images, text not selectable", In("pdf"), "pdf", NoRun, !gs)
-        { Suffix = "-compressed", Prompt = "How strong: low, medium or strong.", Check = Tools.CheckPdfLevel,
-          RunWith = (s, d, a, p, ct) => Tools.PdfShrink(s, d, Tools.PdfLevel(a)!.Value, p, ct) });
-        ops.Add(new Op("t.pdf.redact", OpKind.Tool, "Redact", "PDF", "Black out words you name; pages become images", In("pdf"), "pdf",
-            (s, d, p, ct) => Task.CompletedTask) { Suffix = "-redacted", Prompt = "Words or phrases to black out, separated by commas.",
-            RunWith = (s, d, terms, p, ct) => PdfRedact(s, d, terms, p, ct) });
+        // ---- PDF, grouped like iLovePDF: Organize, Optimize, Edit, Security
+        bool qpdf = Engines.Has("qpdf");
+        ops.Add(new Op("t.pdf.merge", OpKind.Tool, "Merge", "Organize", "Join PDFs in the order selected", In("pdf"), "pdf",
+            (s, d, p, ct) => PdfTools.Merge(s.Split('\n'), d, ct), qpdf, "qpdf") { Batch = true, MinFiles = 2, Suffix = "-merged" });
+        ops.Add(new Op("t.pdf.split", OpKind.Tool, "Split", "Organize", "Every page, or page ranges, as separate PDFs", In("pdf"), "", NoRun, qpdf, "qpdf")
+        { IsFolderOut = true, Suffix = " (split)", Prompt = PdfTools.SplitHelp, Check = PdfTools.CheckSplit, RunWith = (s, d, a, p, ct) => PdfTools.Split(s, d, a, p, ct) });
+        ops.Add(new Op("t.pdf.organize", OpKind.Tool, "Organize", "Organize", "Reorder or remove pages", In("pdf"), "pdf", NoRun, qpdf, "qpdf")
+        { Suffix = "-organized", Prompt = PdfTools.OrganizeHelp, Check = PdfTools.CheckRanges, RunWith = (s, d, a, p, ct) => PdfTools.Organize(s, d, a, ct) });
+        ops.Add(new Op("t.pdf.rotate", OpKind.Tool, "Rotate right", "Organize", "Every page 90° clockwise, lossless", In("pdf"), "pdf",
+            (s, d, p, ct) => PdfTools.Rotate(s, d, 90, ct), qpdf, "qpdf") { Suffix = "-rotated" });
+        ops.Add(new Op("t.pdf.rotateleft", OpKind.Tool, "Rotate left", "Organize", "Every page 90° anticlockwise, lossless", In("pdf"), "pdf",
+            (s, d, p, ct) => PdfTools.Rotate(s, d, -90, ct), qpdf, "qpdf") { Suffix = "-rotated" });
+        ops.Add(new Op("t.pdf.compress", OpKind.Tool, "Compress", "Optimize", "Smaller file, nothing on the page changes (lossless)", In("pdf"), "pdf",
+            (s, d, p, ct) => PdfTools.CompressLossless(s, d, ct), qpdf, "qpdf") { Suffix = "-compressed" });
+        ops.Add(new Op("t.pdf.smaller", OpKind.Tool, "Compress more", "Optimize", "Much smaller: pictures resampled, text stays sharp", In("pdf"), "pdf", NoRun, gs, "Ghostscript")
+        { Suffix = "-compressed", Prompt = "How much: low (pictures 300 dpi), medium (150 dpi) or strong (72 dpi).", Check = PdfTools.CheckGsPreset,
+          RunWith = (s, d, a, p, ct) => PdfTools.CompressSmaller(s, d, PdfTools.GsPreset(a)!, ct) });
+        ops.Add(new Op("t.pdf.repair", OpKind.Tool, "Repair", "Optimize", "Rebuild a damaged PDF", In("pdf"), "pdf",
+            (s, d, p, ct) => PdfTools.Repair(s, d, ct), qpdf, "qpdf") { Suffix = "-repaired" });
+        ops.Add(new Op("t.pdf.numbers", OpKind.Tool, "Page numbers", "Edit", "1 / 12 at the bottom of each page", In("pdf"), "pdf",
+            (s, d, p, ct) => PdfTools.PageNumbers(s, d, ct), qpdf, "qpdf") { Suffix = "-numbered" });
+        ops.Add(new Op("t.pdf.watermark", OpKind.Tool, "Watermark", "Edit", "Your text across every page", In("pdf"), "pdf", NoRun, qpdf && magick, "qpdf")
+        { Suffix = "-watermarked", Prompt = "Watermark text, like CONFIDENTIAL.", RunWith = (s, d, a, p, ct) => PdfTools.Watermark(s, d, a, ct) });
+        ops.Add(new Op("t.pdf.crop", OpKind.Tool, "Crop", "Edit", "Cut the margins off every page", In("pdf"), "pdf", NoRun, qpdf, "qpdf")
+        { Suffix = "-cropped", Prompt = PdfTools.CropHelp, Check = PdfTools.CheckMargins, RunWith = (s, d, a, p, ct) => PdfTools.CropMargins(s, d, a, ct) });
+        ops.Add(new Op("t.pdf.redact", OpKind.Tool, "Redact", "Edit", "Black out words you name; those pages become images", In("pdf"), "pdf", NoRun)
+        { Suffix = "-redacted", Prompt = "Words or phrases to black out, separated by commas.", RunWith = (s, d, terms, p, ct) => PdfRedact(s, d, terms, p, ct) });
+        ops.Add(new Op("t.pdf.unlock", OpKind.Tool, "Unlock", "Security", "Remove the password and restrictions", In("pdf"), "pdf", NoRun, qpdf, "qpdf")
+        { Suffix = "-unlocked", Secret = true, AllowBlank = true, Prompt = "Password (leave empty if the PDF opens without one).", RunWith = (s, d, a, p, ct) => PdfTools.Unlock(s, d, a, ct) });
+        ops.Add(new Op("t.pdf.protect", OpKind.Tool, "Protect", "Security", "Password-protect with AES-256", In("pdf"), "pdf", NoRun, qpdf, "qpdf")
+        { Suffix = "-protected", Secret = true, Prompt = "Password to open the PDF.", Check = PdfTools.CheckPassword, RunWith = (s, d, a, p, ct) => PdfTools.Protect(s, d, a, ct) });
+        ops.Add(new Op("t.pdf.strip", OpKind.Tool, "Strip metadata", "Security", "Clear title, author, subject, keywords", In("pdf"), "pdf",
+            (s, d, p, ct) => Task.Run(() => PdfStrip(s, d), ct)) { Suffix = "-clean" });
         ops.Add(new Op("t.zip", OpKind.Tool, "Zip", "Archive", "Put the selection in one ZIP", p => true, "zip",
             (s, d, p, ct) => Task.Run(() => ZipPaths(s.Split('\n'), d), ct)) { Batch = true });
         ops.Add(new Op("t.unpack", OpKind.Tool, "Unpack", "Archive", "Extract into a folder", In(archIn), "",
@@ -302,26 +320,7 @@ public static class Registry
     }
 
     // ---------------- PDF (PdfPig, Apache-2.0, no engine needed)
-    // PdfPig's merger writes a fresh document, so merge, split and "strip metadata" are all one call; the
-    // original title/author/keywords do not carry over.
-    static void PdfMerge(string[] files, string dst) =>
-        File.WriteAllBytes(dst, PdfMerger.Merge(files.Select(File.ReadAllBytes).ToList()));
-
-    static void PdfSplit(string src, string dstDir, Action<double> progress, CancellationToken ct)
-    {
-        Directory.CreateDirectory(dstDir);
-        var bytes = File.ReadAllBytes(src);
-        int pages;
-        using (var d = PdfDocument.Open(bytes)) pages = d.NumberOfPages;
-        for (int i = 1; i <= pages; i++)
-        {
-            ct.ThrowIfCancellationRequested();
-            File.WriteAllBytes(Path.Combine(dstDir, $"page-{i}.pdf"),
-                PdfMerger.Merge(new List<byte[]> { bytes }, new List<IReadOnlyList<int>> { new[] { i } }));
-            progress((double)i / pages);
-        }
-    }
-
+    // PdfPig's merger writes a fresh document, so "strip metadata" is one call: title/author/keywords do not carry over.
     /// <summary>
     /// Real redaction: each page is drawn to pixels, the matching words are painted black in the pixels, and the
     /// pages are written back as images, so the hidden text no longer exists in the file. (Windows.Data.Pdf draws

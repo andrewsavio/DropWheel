@@ -13,7 +13,6 @@ Tools wheel,tools,should,yes,yes,"Ctrl by default, rebindable"
 Compress image/video/audio/PDF incl target size,tools,should,yes,yes,"fixed presets plus Compress to… a size or quality for images, video and audio; PDF compress without Ghostscript (pages become images)"
 Crop / trim / redact,tools,could,yes,no,needs a parameter UI
 Edit or strip metadata,tools,could,yes,partial,strip for images and PDF tested; editing not built
-Merge / split PDF,tools,could,yes,yes,"PdfPig (Apache-2.0), tested"
 Read QR,tools,could,yes,no,not built
 Actions wheel (Copy Move Copy Path Terminal),actions,could,yes,yes,plus Show in folder; dialogs and terminal untested by hand
 AirDrop,actions,could,yes,skip,no Windows equivalent; Share/Nearby Share needs a packaged helper
@@ -32,7 +31,7 @@ Offline-only (no network capability),privacy,must,yes,yes,no network code found 
 Sandboxed / least-privilege packaging,privacy,could,yes,no,PRD App Sandbox; Windows equivalent is MSIX; not packaged
 "Resize / enlarge to exact px, width, height, % or print size",tools,should,yes,yes,"images (ImageMagick Lanczos or Windows) and video; 1920x1080, 800, x600, 50%, 2x, 6x4in@300dpi; enlarging is plain scaling, no AI upscaling"
 Images to one PDF,tools,could,yes,yes,"batch, page per picture, no engine needed"
-PDF to JPG/PNG without extra installs,convert,could,yes,yes,Windows PDF renderer at 150 dpi when Poppler is missing
+PDF to JPG/PNG without extra installs,convert,could,yes,yes,"Ghostscript at 200 dpi (PNG lossless, JPG q95); Windows renderer as fallback"
 "Rotate image (left, right)",tools,could,yes,yes,"jpegtran: lossless for JPG on the 16 px grid (4 turns give identical pixels), else one re-save at source quality"
 Lossless compress JPG PNG GIF SVG,tools,must,yes,yes,"jpegtran, oxipng, gifsicle, own SVG minifier; self-test proves 0 pixels change; never bigger"
 "Crop (ratio, centre size, exact pixels)",tools,should,yes,yes,JPG lossless via jpegtran for ratio/centre crops (snapped to the block grid)
@@ -41,4 +40,20 @@ Meme captions,tools,could,yes,yes,TOP | BOTTOM in Impact
 Animated GIF from several pictures,convert,could,yes,yes,"0.5 s per frame, looping"
 RAW and PSD input,convert,could,yes,yes,CR2 CR3 NEF ARW DNG RAF ORF RW2 PSD PSB via bundled ImageMagick
 HTML page to image,convert,could,yes,yes,".html or .url file, Microsoft Edge headless, 1280 wide full page"
-Engines bundled with the app,core,must,yes,partial,"image engines bundled (fetch-engines.ps1, hash-pinned); ffmpeg, PDF and office engines still from PATH"
+Engines bundled with the app,core,must,yes,partial,"image and PDF engines bundled (68 MB, hash-pinned by fetch-engines.ps1); ffmpeg and office engines still from PATH"
+PDF merge and split (ranges),tools,must,yes,yes,"qpdf, lossless; split every page or 1-3, 4-6, 7-z"
+PDF compress (lossless and smaller),tools,must,yes,yes,"qpdf lossless (same text and photo bytes proven); Ghostscript low/medium/strong for much smaller, text stays text"
+"Organize PDF (reorder, delete pages)",tools,should,yes,yes,"typed page order, not drag-and-drop thumbnails"
+Rotate PDF,tools,should,yes,yes,"qpdf, every page, lossless"
+Unlock and protect PDF,tools,should,yes,yes,"AES-256; masked password box; passwords passed by temp file, not command line"
+Repair PDF,tools,could,yes,yes,"qpdf, then Ghostscript if qpdf output is not clean"
+Page numbers,tools,could,yes,yes,"""n / N"" bottom centre as an overlay; position and style not configurable; rotated pages untested"
+Watermark PDF,tools,could,yes,yes,"text, grey 30%, diagonal, overlay; image watermark not built"
+Crop PDF margins,tools,could,yes,yes,"crop box per page through qpdf JSON, lossless; visual crop area not built"
+PDF/A,convert,could,yes,yes,Ghostscript PDF/A-2b with sRGB intent; not checked with a validator
+Extract images from PDF,convert,could,yes,yes,"JPGs byte for byte, others PNG"
+HTML to PDF,convert,could,yes,yes,"Microsoft Edge print to PDF, no header/footer"
+PDF to Markdown,convert,could,yes,partial,"text in reading order with a heading per page; headings, tables and links not rebuilt"
+Word/PowerPoint/Excel to and from PDF,convert,should,yes,partial,Phase 3: needs LibreOffice (not bundled yet)
+OCR PDF,tools,could,yes,no,Phase 4: Tesseract
+"Edit, sign, forms, compare PDF",tools,could,yes,skip,"need a full editing window, not a drop wheel"

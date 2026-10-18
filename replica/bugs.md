@@ -25,6 +25,8 @@ Test-script mistakes, not app bugs, found along the way: `SetCursorPos` does not
 | B15 | S4 | Crop accepted 0:0 | 0 divided by 0 is NaN, which passed the range check | NaN rejected |
 | B16 | S3 | Strip metadata re-saved JPGs at quality 95 | lossy for a tool that should only remove tags | jpegtran / oxipng; pixels proven unchanged |
 
+| B17 | S3 | Repairing a PDF whose trailer was lost gave a file that still read as damaged | qpdf rebuilds the xref but writes the trailer without /Size | result must pass `qpdf --check`; otherwise Ghostscript rewrites it (self-test: truncated PDF comes back clean) |
+
 ## Open
 
 None at S1 or S2.

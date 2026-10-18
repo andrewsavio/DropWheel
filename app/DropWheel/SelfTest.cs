@@ -88,7 +88,7 @@ public static class SelfTest
             var p1 = P("one.pdf"); var p2 = P("two.pdf");
             var merged = await Run("t.pdf.merge", p1, p2);
             using (var m = PdfDocument.Open(merged)) Check("merge pdf", m.NumberOfPages == 2, m.NumberOfPages + " pages");
-            var split = await Run("t.pdf.split", merged);
+            var split = await Ask("t.pdf.split", "all", merged);
             Check("split pdf", Directory.GetFiles(split, "*.pdf").Length == 2);
             var stripped = await Run("t.pdf.strip", p1);
             using (var s = PdfDocument.Open(stripped)) Check("strip pdf author", string.IsNullOrEmpty(s.Information.Author), "author='" + s.Information.Author + "'");
@@ -134,6 +134,7 @@ public static class SelfTest
             await EngineChecks(dir, png);
             await ToolChecks(dir, png);
             await ImageChecks(dir, png);
+            await PdfChecks(dir);
 
             Log.AppendLine("engines: " + string.Join(", ", new[] { "ffmpeg", "magick", "pandoc", "soffice", "7z", "pdftoppm", "gswin64c" }.Select(e => $"{e}={(Engines.Has(e) ? "yes" : "no")}")));
             Log.AppendLine("ops available: " + Registry.All().Count(o => o.Available) + " of " + Registry.All().Count);
@@ -226,10 +227,10 @@ public static class SelfTest
         });
         await T("PDF compress makes a scan-like PDF smaller", async () =>
         {
-            var o = await Ask("t.pdf.shrink", "strong", twoPages); using var d = PdfDocument.Open(o);
+            var o = await Ask("t.pdf.smaller", "strong", twoPages); using var d = PdfDocument.Open(o);
             return (d.NumberOfPages == 2 && new FileInfo(o).Length < new FileInfo(twoPages).Length, $"{new FileInfo(twoPages).Length / 1024} KB -> {new FileInfo(o).Length / 1024} KB");
         });
-        Check("PDF compress refuses unknown strength", Tools.CheckPdfLevel("max power") != null);
+        Check("PDF compress refuses unknown strength", PdfTools.CheckGsPreset("max power") != null);
 
         if (!Engines.Has("ffmpeg")) return;
         var mp4 = Path.Combine(dir, "clip.mp4"); var wav = Path.Combine(dir, "tone.wav");
@@ -362,6 +363,131 @@ public static class SelfTest
             var html = Path.Combine(dir, "page.html");
             File.WriteAllText(html, "<!doctype html><html><body style=\"margin:0\"><div style=\"height:300px;background:#f08a3a\">Hello</div></body></html>");
             await T("HTML page to PNG, 1280 wide", async () => { var o = await Run("html>png", html); return (Width(o) == 1280 && Height(o) >= 300 && Height(o) < 1500, $"{Width(o)}x{Height(o)}"); });
+        }
+    }
+
+    static string PageText(string pdf, int n, string? password = null)
+    {
+        using var d = password == null ? PdfDocument.Open(pdf) : PdfDocument.Open(pdf, new UglyToad.PdfPig.ParsingOptions { Password = password });
+        return d.GetPage(n).Text;
+    }
+    static int Pages(string pdf) { using var d = PdfDocument.Open(pdf); return d.NumberOfPages; }
+
+    static async Task PdfChecks(string dir)
+    {
+        if (!Engines.Has("qpdf") || !Engines.Has("gswin64c")) { Check("PDF engines present (run app/fetch-engines.ps1)", false); return; }
+        async Task T(string name, Func<Task<(bool ok, string info)>> body)
+        {
+            try { var (ok, info) = await body(); Check(name, ok, info); }
+            catch (Exception e) { Check(name, false, e.Message); }
+        }
+        long Len(string p) => new FileInfo(p).Length;
+        Check("PDF engines come from the bundled folder", Engines.Find("qpdf")!.Contains(@"\engines\") && Engines.Find("gswin64c")!.Contains(@"\engines\"));
+
+        // a 3-page document with real text and a photo on page 1
+        var photoBytes = File.ReadAllBytes(Photo(Path.Combine(dir, "pdfphoto.jpg"), 1600, 1200));
+        var b = new PdfDocumentBuilder();
+        var font = b.AddStandard14Font(UglyToad.PdfPig.Fonts.Standard14Fonts.Standard14Font.Helvetica);
+        string[] words = { "Page one alpha", "Page two beta", "Page three gamma" };
+        for (int i = 0; i < 3; i++)
+        {
+            var pg = b.AddPage(UglyToad.PdfPig.Content.PageSize.A4);
+            pg.AddText(words[i], 18, new UglyToad.PdfPig.Core.PdfPoint(60, 760), font);
+            if (i == 0) pg.AddJpeg(photoBytes, new UglyToad.PdfPig.Core.PdfRectangle(60, 300, 535, 656));
+        }
+        var doc = Path.Combine(dir, "doc.pdf"); File.WriteAllBytes(doc, b.Build());
+        bool SameText(string o) => Enumerable.Range(1, 3).All(n => PageText(o, n) == PageText(doc, n));
+
+        // optimize
+        await T("PDF lossless compress: same text, same photo bytes, not bigger", async () =>
+        {
+            var o = await Run("t.pdf.compress", doc);
+            using var d = PdfDocument.Open(o);
+            bool photo = d.GetPage(1).GetImages().Single().RawBytes.ToArray().SequenceEqual(photoBytes);
+            return (SameText(o) && photo && Len(o) <= Len(doc), $"{Len(doc) / 1024} -> {Len(o) / 1024} KB, photo identical={photo}");
+        });
+        await T("PDF compress more (strong): much smaller, text is still text", async () =>
+        {
+            var o = await Ask("t.pdf.smaller", "strong", doc);
+            return (Len(o) < Len(doc) / 2 && PageText(o, 2).Contains("Page two beta") && Pages(o) == 3, $"{Len(doc) / 1024} -> {Len(o) / 1024} KB");
+        });
+        var broken = Path.Combine(dir, "broken.pdf");
+        var bytes = File.ReadAllBytes(doc); File.WriteAllBytes(broken, bytes[..(bytes.Length - 400)]); // xref table and trailer cut off
+        await T("PDF repair rebuilds a file with its xref cut off, and the result checks clean", async () =>
+        {
+            var o = await Run("t.pdf.repair", broken);
+            bool clean; try { await Engines.Run("qpdf", new[] { "--check", o }, default); clean = true; } catch { clean = false; }
+            return (clean && Pages(o) == 3 && PageText(o, 3).Contains("gamma"), $"{Pages(o)} pages, qpdf --check clean={clean}");
+        });
+
+        // organize
+        var other = Path.Combine(dir, "other.pdf"); File.Copy(doc, other);
+        await T("PDF merge: 3 + 3 pages", async () => { var o = await Run("t.pdf.merge", doc, other); return (Pages(o) == 6, Pages(o) + " pages"); });
+        await T("PDF split all: one file per page", async () => { var o = await Ask("t.pdf.split", "all", doc); return (Directory.GetFiles(o, "*.pdf").Length == 3, Directory.GetFiles(o).Length + " files"); });
+        await T("PDF split ranges 1-2, 3", async () =>
+        {
+            var o = await Ask("t.pdf.split", "1-2, 3", doc); var files = Directory.GetFiles(o, "*.pdf").OrderBy(x => x).ToArray();
+            return (files.Length == 2 && files.Select(Pages).OrderBy(x => x).SequenceEqual(new[] { 1, 2 }), string.Join(", ", files.Select(Path.GetFileName)));
+        });
+        await T("PDF organize 3,1: page 3 first, page 2 gone", async () => { var o = await Ask("t.pdf.organize", "3,1", doc); return (Pages(o) == 2 && PageText(o, 1).Contains("gamma") && PageText(o, 2).Contains("alpha"), Pages(o) + " pages"); });
+        await T("PDF rotate right: pages turned, content untouched", async () =>
+        {
+            var o = await Run("t.pdf.rotate", doc); using var d = PdfDocument.Open(o);
+            return (d.GetPage(1).Rotation.Value == 90 && SameText(o), "rotation " + d.GetPage(1).Rotation.Value);
+        });
+        Check("bad page ranges are refused", PdfTools.CheckRanges("1-") != null && PdfTools.CheckRanges("abc") != null && PdfTools.CheckSplit("all") == null && PdfTools.CheckRanges("1-3, 5, 7-z") == null);
+
+        // security
+        string locked = "";
+        await T("PDF protect: will not open without the password, opens with it", async () =>
+        {
+            locked = await Ask("t.pdf.protect", "s3cret-pw", doc);
+            bool refused; try { PageText(locked, 1); refused = false; } catch { refused = true; }
+            return (refused && PageText(locked, 1, "s3cret-pw").Contains("alpha"), $"refused without password={refused}");
+        });
+        await T("PDF unlock with the right password", async () => { var o = await Ask("t.pdf.unlock", "s3cret-pw", locked); return (PageText(o, 1).Contains("alpha"), "opens without password"); });
+        await T("PDF unlock with a wrong password says so", async () =>
+        {
+            try { await Ask("t.pdf.unlock", "nope", locked); return (false, "no error"); }
+            catch (InvalidOperationException e) { return (e.Message == "That password is not right.", e.Message); }
+        });
+        Check("short passwords are refused", PdfTools.CheckPassword("abc") != null && PdfTools.CheckPassword("abcd") == null);
+
+        // edit
+        await T("PDF page numbers: 2 / 3 on page 2, original text kept", async () => { var o = await Run("t.pdf.numbers", doc); return (PageText(o, 2).Contains("2 / 3") && PageText(o, 2).Contains("Page two beta"), PageText(o, 2)); });
+        await T("PDF watermark: an extra picture on every page, text kept", async () =>
+        {
+            var o = await Ask("t.pdf.watermark", "CONFIDENTIAL", doc); using var d = PdfDocument.Open(o);
+            return (d.GetPage(1).GetImages().Count() == 2 && d.GetPage(3).GetImages().Count() == 1 && SameText(o), $"page 1 pictures {d.GetPage(1).GetImages().Count()}");
+        });
+        await T("PDF crop 10 mm: crop box 28.3 pt in on each side, page content kept", async () =>
+        {
+            var o = await Ask("t.pdf.crop", "10", doc); using var d = PdfDocument.Open(o);
+            var c = d.GetPage(2).CropBox.Bounds; var m = d.GetPage(2).MediaBox.Bounds;
+            bool ok = Math.Abs(c.Left - 28.35) < 0.1 && Math.Abs(m.Right - c.Right - 28.35) < 0.1 && Math.Abs(m.Top - c.Top - 28.35) < 0.1;
+            return (ok && PageText(o, 2).Contains("beta"), $"crop {c.Left:0.#},{c.Bottom:0.#},{c.Right:0.#},{c.Top:0.#} of {m.Right:0.#}x{m.Top:0.#}");
+        });
+        Check("bad margins are refused", PdfTools.CheckMargins("big") != null && PdfTools.CheckMargins("10, 5, 10, 5") == null);
+
+        // convert
+        await T("PDF/A-2b: archive marker and colour profile", async () =>
+        {
+            var o = await Run("pdf>pdfa", doc); var raw = System.Text.Encoding.Latin1.GetString(File.ReadAllBytes(o));
+            return (raw.Contains("pdfaid:part") && raw.Contains("/OutputIntents") && Pages(o) == 3, "marker and intent present");
+        });
+        await T("PDF extract images: the photo comes out byte for byte", async () =>
+        {
+            var o = await Run("pdf>images", doc); var f = Directory.GetFiles(o).Single();
+            return (f.EndsWith(".jpg") && File.ReadAllBytes(f).SequenceEqual(photoBytes), Path.GetFileName(f));
+        });
+        // A4 at 200 dpi is 1653.6 px, so allow rounding either way
+        await T("PDF to PNG at 200 dpi", async () => { var o = await Run("pdf>png", doc); var f = Directory.GetFiles(o, "*.png"); return (f.Length == 3 && Math.Abs(Width(f[0]) - 1654) <= 1, $"{f.Length} files, {Width(f[0])} px wide"); });
+        await T("PDF to text without Poppler", async () => { var o = await Run("pdf>txt", doc); var t = File.ReadAllText(o); return (t.Contains("Page one alpha") && t.Contains("Page three gamma"), t.Length + " chars"); });
+        if (Engines.Has("msedge"))
+        {
+            var html = Path.Combine(dir, "print.html");
+            File.WriteAllText(html, "<!doctype html><html><body><h1>Hello PDF</h1><p>Printed by Edge.</p></body></html>");
+            await T("HTML page to PDF", async () => { var o = await Run("html>pdf", html); return (Pages(o) >= 1 && PageText(o, 1).Contains("Hello PDF"), Pages(o) + " page(s)"); });
         }
     }
 

@@ -57,3 +57,10 @@ Tools wheel for pictures is grouped like iLoveIMG: Optimize (Compress lossless, 
 Self-test 103/103, lossless claims proven by pixel comparison. Live: Ctrl-drag, Optimize, Compress and Ctrl-drag, Edit, Crop 1:1 both pass.
 **Harder than expected:** the portable ImageMagick reads HEIC but cannot write it, so "to HEIC" now only shows when it can. jpegtran crops lossless only on its block grid. A deadlock (B13) would have frozen every wheel; only the time-limited self-test caught it.
 Not built from iLoveIMG: Photo editor (needs an editing window), Upscale/Remove background/Blur face (Phase 4, AI), image watermarks.
+
+## Phase 2: iLovePDF tools (2026-10-18)
+Engines added and hash-pinned: qpdf 12.4.2, Ghostscript 10.08.0. ImageMagick trimmed from 247 to 31 MB (its portable build had 8 copies of one program). Bundle now 68 MB.
+PDF Tools wheel grouped like iLovePDF: Organize (Merge, Split, Organize, Rotate right/left), Optimize (Compress lossless, Compress more, Repair), Edit (Page numbers, Watermark, Crop, Redact), Security (Unlock, Protect, Strip metadata). Convert adds PDF/A, Images (extract), JPG/PNG via Ghostscript, TXT/MD via PdfPig, and HTML to PDF.
+Lossless where the job allows: qpdf for rewrites, page numbers and watermarks laid over the original pages, crop by crop box. The old compress that turned pages into pictures is gone.
+Self-test 126/126. Live: Ctrl-drag a PDF, Organize, Rotate right; and Security, Protect (masked password typed through UI Automation), output verified as AES-256 needing the password.
+**Harder than expected:** qpdf leaves /Size out of a rebuilt trailer (B17). PowerShell splits -sOutputFile=x.pdf at the dot, so engine probes must be done from C#. PDF/A needs an ICC profile path inside Ghostscript's ROM.
