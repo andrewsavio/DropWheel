@@ -50,3 +50,10 @@ Added Resize/enlarge, Compress to… (size or quality), Rotate, Images to PDF, v
 
 ## Trial removed (2026-10-18)
 Personal use, so the 20-file allowance, paywall window, license section in Settings and license table (new installs) are gone. Existing databases keep an unused license table. Self-test 82/82, live drag passes.
+
+## Phase 1: iLoveIMG tools (2026-10-18)
+Engines bundled and hash-pinned by `app/fetch-engines.ps1`: ImageMagick 7.1.2-34 portable, oxipng 10.2.1, libjpeg-turbo 3.2.0 (jpegtran), gifsicle 1.97. Copied next to the exe; `Engines.Find` prefers them over PATH.
+Tools wheel for pictures is grouped like iLoveIMG: Optimize (Compress lossless, Compress to…, Strip metadata), Edit (Resize, Crop, Rotate right/left), Create (Watermark, Meme, To PDF); Zip shows directly. Convert adds Animated GIF, RAW/PSD input, HTML to PNG/JPG.
+Self-test 103/103, lossless claims proven by pixel comparison. Live: Ctrl-drag, Optimize, Compress and Ctrl-drag, Edit, Crop 1:1 both pass.
+**Harder than expected:** the portable ImageMagick reads HEIC but cannot write it, so "to HEIC" now only shows when it can. jpegtran crops lossless only on its block grid. A deadlock (B13) would have frozen every wheel; only the time-limited self-test caught it.
+Not built from iLoveIMG: Photo editor (needs an editing window), Upscale/Remove background/Blur face (Phase 4, AI), image watermarks.

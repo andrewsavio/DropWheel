@@ -20,6 +20,11 @@ Test-script mistakes, not app bugs, found along the way: `SetCursorPos` does not
 | B11 | S2 | Shift pressed mid-drag did nothing unless the mouse moved again | user trace: a 2 s drag with Shift never registered (`shift=False` on every move); the trigger was only checked on mouse moves, through GetAsyncKeyState | keyboard hook tracks Shift/Ctrl/Alt and opens the wheel on key-down during a drag; new e2e scenario `still` (key down, no movement) passes, trace shows `trigger Convert (key)` |
 | B12 | S3 | White wheel labels unreadable over dark windows | glass over dark Explorer goes mid-grey; white text about 2.8:1 | labels are dark brown on glass, readable on dark and bright desktops |
 
+| B13 | S1 | Opening a wheel would freeze the app | found by the self-test hanging: checking which formats ImageMagick can write blocked the UI thread on async work that needed the UI thread | plain blocking process call; no blocking waits on async code left in UI paths |
+| B14 | S2 | PSD to PNG made an empty file | ImageMagick writes one file per PSD layer unless told to take the merged picture | PSD/PSB read as frame 0 (the merged picture) |
+| B15 | S4 | Crop accepted 0:0 | 0 divided by 0 is NaN, which passed the range check | NaN rejected |
+| B16 | S3 | Strip metadata re-saved JPGs at quality 95 | lossy for a tool that should only remove tags | jpegtran / oxipng; pixels proven unchanged |
+
 ## Open
 
 None at S1 or S2.

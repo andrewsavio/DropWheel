@@ -5,7 +5,9 @@ param(
   [string]$Out = "$PSScriptRoot\out",
   [string]$Key = "Shift",
   [int]$SlotIndex = 0,        # 0 = top slot of the wheel, clockwise
-  [int]$Slots = 8,            # how many slots this file type shows
+  [int]$Slots = 8,
+  [int]$Group = -1,           # hover this group wedge first (0 = top), then drop on SlotIndex inside it
+  [int]$Groups = 4,           # how many wedges the top level shows            # how many slots this file type shows
   [string]$Expect = "pic.jpg",
   [string]$ExpectClipboard = "",   # for actions that copy text instead of writing a file
   [ValidateSet("drop", "nokey", "cancel", "marquee", "still")][string]$Scenario = "drop"
@@ -138,6 +140,16 @@ else {
   # wedge labels sit on a ring of radius about 125 dip, first wedge at the top, clockwise
   $ang = $SlotIndex * 2 * [math]::PI / $Slots - [math]::PI / 2
   $tx = $cx + [math]::Cos($ang) * 125 * $scale; $ty = $cy + [math]::Sin($ang) * 125 * $scale
+}
+if ($Group -ge 0 -and $Scenario -ne "cancel") {
+  # open the group by resting on its wedge, as a person would, then go on to the tool inside it
+  $ga = $Group * 2 * [math]::PI / $Groups - [math]::PI / 2
+  $gx = $cx + [math]::Cos($ga) * 125 * $scale; $gy = $cy + [math]::Sin($ga) * 125 * $scale
+  for ($i = 1; $i -le 10; $i++) { MoveTo ($cur.X + ($gx - $cur.X) * $i / 10) ($cur.Y + ($gy - $cur.Y) * $i / 10) }
+  Start-Sleep -Milliseconds 300; Shot "drag-$Scenario-top"; Start-Sleep -Milliseconds 500
+  # back through the centre so the path does not cross other wedges, then out to the tool
+  for ($i = 1; $i -le 6; $i++) { MoveTo ($gx + ($cx - $gx) * $i / 6) ($gy + ($cy - $gy) * $i / 6) }
+  $cur.X = [int]$cx; $cur.Y = [int]$cy
 }
 for ($i = 1; $i -le 12; $i++) { MoveTo ($cur.X + ($tx - $cur.X) * $i / 12) ($cur.Y + ($ty - $cur.Y) * $i / 12) }
 Start-Sleep -Milliseconds 300

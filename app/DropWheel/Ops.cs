@@ -45,6 +45,9 @@ public static class Engines
                 .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
                 .Select(d => { try { return Path.Combine(d.Trim('"'), exe + ".exe"); } catch { return ""; } })
                 .FirstOrDefault(File.Exists);
+            if (found == null && exe == "msedge")
+                found = new[] { @"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe", @"C:\Program Files\Microsoft\Edge\Application\msedge.exe" }
+                    .FirstOrDefault(File.Exists);
             if (found == null && exe == "soffice")
                 found = new[] { @"C:\Program Files\LibreOffice\program\soffice.exe", @"C:\Program Files (x86)\LibreOffice\program\soffice.exe" }
                     .FirstOrDefault(File.Exists);

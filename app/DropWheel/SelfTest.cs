@@ -133,6 +133,7 @@ public static class SelfTest
 
             await EngineChecks(dir, png);
             await ToolChecks(dir, png);
+            await ImageChecks(dir, png);
 
             Log.AppendLine("engines: " + string.Join(", ", new[] { "ffmpeg", "magick", "pandoc", "soffice", "7z", "pdftoppm", "gswin64c" }.Select(e => $"{e}={(Engines.Has(e) ? "yes" : "no")}")));
             Log.AppendLine("ops available: " + Registry.All().Count(o => o.Available) + " of " + Registry.All().Count);
@@ -240,6 +241,128 @@ public static class SelfTest
         });
         await T("video compress to 40 KB lands near 40 KB", async () => { var o = await Ask("t.vid.target", "40 KB", mp4); var n = new FileInfo(o).Length; return (n < 40 * 1024 * 1.35 && Plays(o), $"{n / 1024} KB"); });
         await T("audio compress to 16 KB lands near 16 KB", async () => { var o = await Ask("t.aud.target", "16 KB", wav); var n = new FileInfo(o).Length; return (n < 16 * 1024 * 1.35 && n > 16 * 1024 * 0.5 && Plays(o), $"{n / 1024} KB"); });
+    }
+
+    /// <summary>Number of pixels that differ between two images (ImageMagick compare -metric AE); 0 means identical pixels.</summary>
+    static long PixelDiff(string a, string b)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo(Engines.Find("magick")!) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true, RedirectStandardOutput = true };
+        foreach (var x in new[] { "compare", "-metric", "AE", a + "[0]", b + "[0]", "null:" }) psi.ArgumentList.Add(x);
+        using var p = System.Diagnostics.Process.Start(psi)!;
+        var err = p.StandardError.ReadToEnd(); p.WaitForExit(20000);
+        var m = System.Text.RegularExpressions.Regex.Match(err, @"^\s*([\d.e+]+)");
+        return m.Success ? (long)double.Parse(m.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture) : -1;
+    }
+
+    static string Magick(params string[] a) => Cap("magick", a);
+
+    /// <summary>A photo-like JPG: smooth gradient plus fine noise, so compression has real work to do.</summary>
+    static string Photo(string path, int w, int h)
+    {
+        var px = new byte[w * h * 3]; var rnd = new Random(3);
+        for (int y = 0; y < h; y++) for (int x = 0; x < w; x++)
+        {
+            int i = (y * w + x) * 3;
+            px[i] = (byte)Math.Clamp(x * 255 / w + rnd.Next(-12, 12), 0, 255);
+            px[i + 1] = (byte)Math.Clamp(y * 255 / h + rnd.Next(-12, 12), 0, 255);
+            px[i + 2] = (byte)Math.Clamp(128 + rnd.Next(-30, 30), 0, 255);
+        }
+        var enc = new JpegBitmapEncoder { QualityLevel = 92 };
+        enc.Frames.Add(BitmapFrame.Create(BitmapSource.Create(w, h, 96, 96, PixelFormats.Bgr24, null, px, w * 3)));
+        using (var fs = File.Create(path)) enc.Save(fs);
+        return path;
+    }
+
+    static async Task ImageChecks(string dir, string png)
+    {
+        if (!Engines.Has("magick") || !Engines.Has("jpegtran")) { Check("image engines present (run app/fetch-engines.ps1)", false); return; }
+        async Task T(string name, Func<Task<(bool ok, string info)>> body)
+        {
+            try { var (ok, info) = await body(); Check(name, ok, info); }
+            catch (Exception e) { Check(name, false, e.Message); }
+        }
+        long Len(string p) => new FileInfo(p).Length;
+        Check("engines come from the bundled folder", Engines.Find("magick")!.Contains(@"\engines\") && Engines.Find("jpegtran")!.Contains(@"\engines\"), Engines.Find("magick"));
+
+        var photo = Photo(Path.Combine(dir, "photo.jpg"), 640, 480);
+        var odd = Photo(Path.Combine(dir, "odd.jpg"), 641, 479);
+        var gif = Path.Combine(dir, "anim.gif"); Magick("-delay", "20", png, "(", png, "-negate", ")", gif);
+        var svg = Path.Combine(dir, "logo.svg");
+        File.WriteAllText(svg, "<?xml version=\"1.0\"?>\n<!-- made in an editor -->\n<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:inkscape=\"http://www.inkscape.org/namespaces/inkscape\" width=\"120\" height=\"80\" inkscape:version=\"1.3\">\n  <metadata><title>junk</title></metadata>\n  <rect x=\"10\" y=\"10\" width=\"100\" height=\"60\" fill=\"#f08a3a\" inkscape:label=\"box\"/>\n</svg>\n");
+
+        // compress: smaller or equal, and not one pixel changed
+        foreach (var (name, src) in new[] { ("JPG", photo), ("PNG", png), ("GIF", gif), ("SVG", svg) })
+            await T($"lossless compress {name}: same pixels, not bigger", async () =>
+            {
+                var o = await Run("t.img.compress", src);
+                var diff = PixelDiff(src, o);
+                return (diff == 0 && Len(o) <= Len(src), $"{Len(src)} -> {Len(o)} B, {diff} pixels differ");
+            });
+        await T("SVG minify drops comments, metadata and editor markup", async () =>
+        {
+            var o = await Run("t.img.compress", svg); var t = File.ReadAllText(o);
+            return (!t.Contains("<!--") && !t.Contains("metadata") && !t.Contains("inkscape") && t.Contains("<rect"), $"{t.Length} chars");
+        });
+
+        // strip metadata keeps pixels
+        var tagged = Path.Combine(dir, "tagged.jpg"); Magick(photo, "-set", "comment", "secret location", tagged);
+        await T("strip metadata: comment gone, pixels untouched", async () =>
+        {
+            var o = await Run("t.img.strip", tagged);
+            return (Magick("identify", "-format", "%c", o) == "" && PixelDiff(tagged, o) == 0, "comment='" + Magick("identify", "-format", "%c", o) + "'");
+        });
+
+        // crop
+        await T("crop JPG 16:9 is lossless and exact", async () =>
+        {
+            var o = await Ask("t.img.crop", "16:9", photo);
+            var reference = Path.Combine(dir, "ref-crop.png"); Magick(photo, "-crop", "640x360+0+48", "+repage", reference); // centre 60 snapped to the 16 px grid
+            // jpegtran does not re-encode; the decoder's chroma smoothing can still differ by a shade on the new edge, so allow 1 in 10,000 pixels
+            var diff = PixelDiff(reference, o);
+            return (Width(o) == 640 && Height(o) == 360 && diff >= 0 && diff <= 640 * 360 / 10000, $"{Width(o)}x{Height(o)}, {diff} edge pixels differ");
+        });
+        await T("crop exact x,y,w,h off the grid is exact", async () => { var o = await Ask("t.img.crop", "5,7,100,50", photo); return (Width(o) == 100 && Height(o) == 50, $"{Width(o)}x{Height(o)}"); });
+        await T("crop PNG 1:1", async () => { var o = await Ask("t.img.crop", "1:1", png); return (Width(o) == 48 && Height(o) == 48 && o.EndsWith(".png"), $"{Width(o)}x{Height(o)}"); });
+        Check("crop refuses nonsense", ImageTools.CheckCrop("banana") != null && ImageTools.CheckCrop("0:0") != null);
+
+        // rotate: four right turns give back the very same pixels
+        await T("rotate JPG right x4 is lossless", async () =>
+        {
+            var a = await Run("t.img.rotate", photo); bool swapped = Width(a) == 480 && Height(a) == 640;
+            var b = await Run("t.img.rotate", a); var c = await Run("t.img.rotate", b); var d = await Run("t.img.rotate", c);
+            return (swapped && PixelDiff(photo, d) == 0, $"{PixelDiff(photo, d)} pixels differ after 360°");
+        });
+        await T("rotate left on an odd-size JPG still works", async () => { var o = await Run("t.img.rotateleft", odd); return (Width(o) == 479 && Height(o) == 641, $"{Width(o)}x{Height(o)}"); });
+
+        // create
+        await T("watermark keeps the size and marks the corner", async () => { var o = await Ask("t.img.watermark", "© 2026 Test", photo); return (Width(o) == 640 && Height(o) == 480 && PixelDiff(photo, o) > 100, PixelDiff(photo, o) + " pixels changed"); });
+        await T("meme keeps the size and adds both captions", async () => { var o = await Ask("t.img.meme", "top text | bottom text", photo); return (Width(o) == 640 && PixelDiff(photo, o) > 500, PixelDiff(photo, o) + " pixels changed"); });
+        await T("To PDF puts the JPG in byte for byte", async () =>
+        {
+            var o = await Run("t.img.topdf", photo, png);
+            using var d = PdfDocument.Open(o);
+            var raw = d.GetPage(1).GetImages().Single().RawBytes.ToArray();
+            return (d.NumberOfPages == 2 && raw.SequenceEqual(File.ReadAllBytes(photo)), $"{d.NumberOfPages} pages, jpg bytes identical={raw.SequenceEqual(File.ReadAllBytes(photo))}");
+        });
+
+        // convert
+        await T("animated GIF from two pictures has two frames", async () =>
+        {
+            var o = await Run("img>anim", photo, odd);
+            var frames = Magick("identify", "-format", "%n\n", o).Split('\n')[0].Trim();
+            return (frames == "2", frames + " frames");
+        });
+        var psd = Path.Combine(dir, "layer.psd"); Magick(png, psd);
+        await T("PSD converts to PNG", async () => { var o = await Run("img>png", psd); return (Width(o) == 64, $"{Width(o)} wide"); });
+        Check("PSD and RAW are offered in the convert wheel", Registry.For(new[] { psd }, OpKind.Convert).Any(o => o.Id == "img>jpg") && Registry.For(new[] { Path.Combine(dir, "x.cr2") }, OpKind.Convert).Any(o => o.Id == "img>jpg"));
+        Check("HEIC output only when ImageMagick can write it", ImageTools.MagickWrites("heic") == Registry.For(new[] { png }, OpKind.Convert).Any(o => o.Id == "img>heic"), "writes heic=" + ImageTools.MagickWrites("heic"));
+
+        if (Engines.Has("msedge"))
+        {
+            var html = Path.Combine(dir, "page.html");
+            File.WriteAllText(html, "<!doctype html><html><body style=\"margin:0\"><div style=\"height:300px;background:#f08a3a\">Hello</div></body></html>");
+            await T("HTML page to PNG, 1280 wide", async () => { var o = await Run("html>png", html); return (Width(o) == 1280 && Height(o) >= 300 && Height(o) < 1500, $"{Width(o)}x{Height(o)}"); });
+        }
     }
 
     static async Task EngineChecks(string dir, string png)

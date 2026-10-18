@@ -36,7 +36,9 @@ public static class Registry
     static bool Same(string a, string b) => a == b || (a, b) is ("jpeg", "jpg") or ("jpg", "jpeg") or ("tif", "tiff") or ("tiff", "tif") or ("aif", "aiff") or ("aiff", "aif") or ("tgz", "tar.gz");
     static string Up(string e) => e.ToUpperInvariant();
 
-    static readonly string[] ImgIn = { "jpg", "jpeg", "png", "bmp", "tif", "tiff", "gif", "webp", "avif", "heic", "heif", "svg" };
+    static readonly string[] ImgIn = { "jpg", "jpeg", "png", "bmp", "tif", "tiff", "gif", "webp", "avif", "heic", "heif", "svg",
+        "psd", "psb", "dng", "cr2", "cr3", "nef", "arw", "raf", "orf", "rw2" }; // last row needs ImageMagick
+    static readonly string[] WicIn = { "jpg", "jpeg", "png", "bmp", "tif", "tiff", "gif" };
     static readonly string[] VideoIn = { "mp4", "mov", "mkv", "webm", "avi", "wmv", "flv", "m4v", "mpg", "mpeg" };
     static readonly string[] AudioIn = { "mp3", "m4a", "wav", "flac", "ogg", "opus", "aiff", "aif", "wma", "aac" };
     static readonly string[] DocIn = { "md", "markdown", "txt", "html", "htm", "docx", "epub", "rtf", "odt" };
@@ -55,13 +57,19 @@ public static class Registry
              gs = Engines.Has("gswin64c") || Engines.Has("gswin32c");
 
         // ---- images
-        var imgIn = ImgIn.Where(e => magick || e != "svg").ToArray();
+        var imgIn = magick ? ImgIn : WicIn;
         foreach (var o in new[] { "jpg", "png", "bmp", "tiff", "gif", "webp", "avif", "heic", "pdf" })
         {
             bool native = o is "jpg" or "png" or "bmp" or "tiff" or "gif";
             ops.Add(new Op("img>" + o, OpKind.Convert, Up(o), "Image", $"Convert to {Up(o)}", InNot(imgIn, o), o,
-                (s, d, p, ct) => ImageConvert(s, d, o, ct), native || magick, native ? null : "ImageMagick"));
+                (s, d, p, ct) => ImageConvert(s, d, o, ct), native || (magick && (o == "pdf" || ImageTools.MagickWrites(o))), native ? null : "ImageMagick"));
         }
+        ops.Add(new Op("img>anim", OpKind.Convert, "GIF anim", "Image", "Animated GIF from the pictures, in the order selected", In(imgIn), "gif",
+            (s, d, p, ct) => ImageTools.AnimatedGif(s.Split('\n'), d, ct), magick, "ImageMagick") { Batch = true, MinFiles = 2, Suffix = "-animated" });
+        bool edge = Engines.Has("msedge");
+        foreach (var o in new[] { "png", "jpg" })
+            ops.Add(new Op("html>" + o, OpKind.Convert, Up(o), "Web page", $"Picture of the whole page as {Up(o)}", In(ImageTools.HtmlIn), o,
+                (s, d, p, ct) => ImageTools.HtmlToImage(s, d, ct), edge && magick, "Microsoft Edge"));
         // ---- video + audio
         foreach (var o in new[] { "mp4", "mov", "mkv", "webm", "avi", "wmv", "gif" })
             ops.Add(new Op("vid>" + o, OpKind.Convert, Up(o), "Video", $"Convert to {Up(o)}", InNot(VideoIn, o), o,
@@ -121,11 +129,12 @@ public static class Registry
                 (s, d, p, ct) => ArchiveRepack(s, d, o, ct)));
 
         // ---- tools
-        ops.Add(new Op("t.img.compress", OpKind.Tool, "Compress", "Image", "Smaller JPG (quality 72)",
-            In("jpg", "jpeg", "png", "bmp", "tif", "tiff", "gif"), "jpg",
-            (s, d, p, ct) => Task.Run(() => Wic.Convert(s, d, "jpg", 72), ct)) { Suffix = "-compressed" });
-        ops.Add(new Op("t.img.strip", OpKind.Tool, "Strip metadata", "Image", "Re-save without EXIF or location",
-            In("jpg", "jpeg", "png", "tif", "tiff"), "", (s, d, p, ct) => Task.Run(() => Wic.Convert(s, d, Ext(d), 95, strip: true), ct))
+        // images, grouped like iLoveIMG: Optimize, Edit, Create
+        bool lossless = Engines.Has("jpegtran") && Engines.Has("oxipng") && Engines.Has("gifsicle");
+        ops.Add(new Op("t.img.compress", OpKind.Tool, "Compress", "Optimize", "Smaller file, same pixels (lossless)", In(ImageTools.LosslessIn), "",
+            (s, d, p, ct) => ImageTools.CompressLossless(s, d, ct), lossless, "jpegtran, oxipng, gifsicle") { Suffix = "-compressed", SameExt = true });
+        ops.Add(new Op("t.img.strip", OpKind.Tool, "Strip metadata", "Optimize", "Remove EXIF and location; pixels untouched",
+            In("jpg", "jpeg", "png", "tif", "tiff"), "", (s, d, p, ct) => ImageTools.StripMetadata(s, d, ct))
         { Suffix = "-clean", SameExt = true });
         ops.Add(new Op("t.vid.compress", OpKind.Tool, "Compress", "Video", "Smaller MP4 (H.264, CRF 28)", In(VideoIn), "mp4",
             (s, d, p, ct) => Ffmpeg(s, d, new[] { "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "28", "-preset", "medium", "-c:a", "aac", "-b:a", "96k" }, p, ct),
@@ -144,14 +153,22 @@ public static class Registry
             (s, d, p, ct) => Task.Run(() => PdfMerge(s.Split('\n'), d), ct)) { Batch = true, MinFiles = 2, Suffix = "-merged" });
         // ---- "I love" style tools: each asks one question, checked before the job starts
         var sizable = magick ? ImgIn : new[] { "jpg", "jpeg", "png", "bmp", "tif", "tiff", "gif" };
-        ops.Add(new Op("t.img.resize", OpKind.Tool, "Resize", "Image", "Exact size, width, height or percent; enlarges too", In(sizable), "", NoRun)
+        ops.Add(new Op("t.img.resize", OpKind.Tool, "Resize", "Edit", "Exact size, width, height or percent; enlarges too", In(sizable), "", NoRun)
         { SameExt = true, Suffix = "-resized", Prompt = Sizes.ResizeHelp, Check = Sizes.CheckResize, RunWith = (s, d, a, p, ct) => Tools.Resize(s, d, Sizes.Parse(a)!.Value, ct) });
-        ops.Add(new Op("t.img.target", OpKind.Tool, "Compress to…", "Image", "JPG at a file size or quality you choose", In(sizable), "jpg", NoRun)
+        ops.Add(new Op("t.img.target", OpKind.Tool, "Compress to…", "Optimize", "JPG at a file size or quality you choose", In(sizable), "jpg", NoRun)
         { Suffix = "-compressed", Prompt = Sizes.TargetHelp, Check = Sizes.CheckTarget, RunWith = (s, d, a, p, ct) => Task.Run(() => Tools.CompressTo(s, d, Sizes.Target(a)!.Value, ct), ct) });
-        ops.Add(new Op("t.img.rotate", OpKind.Tool, "Rotate", "Image", "Turn 90° clockwise", In(sizable), "",
-            (s, d, p, ct) => Task.Run(() => Tools.Rotate(s, d, 90), ct)) { SameExt = true, Suffix = "-rotated" });
-        ops.Add(new Op("t.img.topdf", OpKind.Tool, "To PDF", "Image", "One PDF, a page per picture, in the order selected", In(sizable), "pdf",
-            (s, d, p, ct) => Task.Run(() => Tools.ImagesToPdf(s.Split('\n'), d, p, ct), ct)) { Batch = true });
+        ops.Add(new Op("t.img.crop", OpKind.Tool, "Crop", "Edit", "Ratio, size from the centre, or exact pixels; JPG stays lossless", In(imgIn), "", NoRun, magick && lossless, "ImageMagick")
+        { SameExt = true, Suffix = "-cropped", Prompt = ImageTools.CropHelp, Check = ImageTools.CheckCrop, RunWith = (s, d, a, p, ct) => ImageTools.Crop(s, d, a, ct) });
+        ops.Add(new Op("t.img.rotate", OpKind.Tool, "Rotate right", "Edit", "90° clockwise; JPG stays lossless", In(imgIn), "",
+            (s, d, p, ct) => ImageTools.Rotate(s, d, 90, ct), magick && lossless, "ImageMagick") { SameExt = true, Suffix = "-rotated" });
+        ops.Add(new Op("t.img.rotateleft", OpKind.Tool, "Rotate left", "Edit", "90° anticlockwise; JPG stays lossless", In(imgIn), "",
+            (s, d, p, ct) => ImageTools.Rotate(s, d, 270, ct), magick && lossless, "ImageMagick") { SameExt = true, Suffix = "-rotated" });
+        ops.Add(new Op("t.img.watermark", OpKind.Tool, "Watermark", "Create", "Your text in the bottom-right corner", In(imgIn), "", NoRun, magick, "ImageMagick")
+        { SameExt = true, Suffix = "-watermarked", Prompt = "Watermark text, like © 2026 Your Name.", RunWith = (s, d, a, p, ct) => ImageTools.Watermark(s, d, a, ct) });
+        ops.Add(new Op("t.img.meme", OpKind.Tool, "Meme", "Create", "Top and bottom caption in classic meme style", In(imgIn), "", NoRun, magick, "ImageMagick")
+        { SameExt = true, Suffix = "-meme", Prompt = "Caption: TOP TEXT | BOTTOM TEXT (the | splits the two lines).", RunWith = (s, d, a, p, ct) => ImageTools.Meme(s, d, a, ct) });
+        ops.Add(new Op("t.img.topdf", OpKind.Tool, "To PDF", "Create", "One PDF, a page per picture; JPG and PNG go in unchanged", In(imgIn), "pdf",
+            (s, d, p, ct) => ImageTools.ToPdf(s.Split('\n'), d, p, ct)) { Batch = true });
         ops.Add(new Op("t.vid.resize", OpKind.Tool, "Resize", "Video", "Exact size, width, height or percent", In(VideoIn), "mp4", NoRun, ffmpeg, "ffmpeg")
         { Suffix = "-resized", Prompt = Sizes.ResizeHelp, Check = Sizes.CheckResize,
           RunWith = (s, d, a, p, ct) => Ffmpeg(s, d, new[] { "-vf", Tools.ScaleFilter(Sizes.Parse(a)!.Value), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "21", "-c:a", "aac" }, p, ct) });
@@ -187,12 +204,12 @@ public static class Registry
     static async Task ImageConvert(string src, string dst, string o, CancellationToken ct)
     {
         bool native = o is "jpg" or "png" or "bmp" or "tiff" or "gif";
-        if (native && Ext(src) != "svg")
+        if (native && WicIn.Contains(Ext(src)))
         {
             try { await Task.Run(() => Wic.Convert(src, dst, o, 90), ct); return; }
             catch when (Engines.Has("magick") && Ext(src) is "heic" or "heif" or "webp" or "avif") { /* codec missing in Windows: retry with ImageMagick. Not for locked, missing or corrupt files: keep their clear message */ }
         }
-        var args = new List<string> { Ext(src) == "gif" && o != "gif" ? src + "[0]" : src };
+        var args = new List<string> { (Ext(src) == "gif" && o != "gif") || Ext(src) is "psd" or "psb" ? src + "[0]" : src };
         if (o is "jpg" or "bmp") args.AddRange(new[] { "-background", "white", "-alpha", "remove", "-alpha", "off" });
         args.Add(dst);
         await Engines.Run("magick", args, ct);

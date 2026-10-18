@@ -13,6 +13,8 @@
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="..\..\replica\schema.sql" LogicalName="schema.sql" />
+    <!-- open-source engines fetched by app/fetch-engines.ps1; Engines.Find looks here before PATH -->
+    <None Include="engines\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.13" />

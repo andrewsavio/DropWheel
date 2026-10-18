@@ -33,4 +33,12 @@ Sandboxed / least-privilege packaging,privacy,could,yes,no,PRD App Sandbox; Wind
 "Resize / enlarge to exact px, width, height, % or print size",tools,should,yes,yes,"images (ImageMagick Lanczos or Windows) and video; 1920x1080, 800, x600, 50%, 2x, 6x4in@300dpi; enlarging is plain scaling, no AI upscaling"
 Images to one PDF,tools,could,yes,yes,"batch, page per picture, no engine needed"
 PDF to JPG/PNG without extra installs,convert,could,yes,yes,Windows PDF renderer at 150 dpi when Poppler is missing
-Rotate image,tools,could,yes,yes,90° clockwise
+"Rotate image (left, right)",tools,could,yes,yes,"jpegtran: lossless for JPG on the 16 px grid (4 turns give identical pixels), else one re-save at source quality"
+Lossless compress JPG PNG GIF SVG,tools,must,yes,yes,"jpegtran, oxipng, gifsicle, own SVG minifier; self-test proves 0 pixels change; never bigger"
+"Crop (ratio, centre size, exact pixels)",tools,should,yes,yes,JPG lossless via jpegtran for ratio/centre crops (snapped to the block grid)
+Watermark text,tools,could,yes,yes,"bottom-right, sized to the picture; image watermark not built"
+Meme captions,tools,could,yes,yes,TOP | BOTTOM in Impact
+Animated GIF from several pictures,convert,could,yes,yes,"0.5 s per frame, looping"
+RAW and PSD input,convert,could,yes,yes,CR2 CR3 NEF ARW DNG RAF ORF RW2 PSD PSB via bundled ImageMagick
+HTML page to image,convert,could,yes,yes,".html or .url file, Microsoft Edge headless, 1280 wide full page"
+Engines bundled with the app,core,must,yes,partial,"image engines bundled (fetch-engines.ps1, hash-pinned); ffmpeg, PDF and office engines still from PATH"

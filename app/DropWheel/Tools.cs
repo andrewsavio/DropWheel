@@ -95,7 +95,7 @@ public static class Tools
         if (!Native.Contains(Registry.Ext(src)))
         {
             tmp = Path.Combine(Path.GetTempPath(), "dw-" + Guid.NewGuid().ToString("N") + ".png");
-            Engines.Run("magick", new[] { src + "[0]", tmp }, default).GetAwaiter().GetResult();
+            Task.Run(() => Engines.Run("magick", new[] { src + "[0]", tmp }, default)).GetAwaiter().GetResult(); // off the UI context, so blocking cannot deadlock
             path = tmp;
         }
         try
@@ -176,28 +176,6 @@ public static class Tools
             b = Scale(b, Math.Max(1, (int)(b.PixelWidth * 0.85)), Math.Max(1, (int)(b.PixelHeight * 0.85)));
         }
         throw new InvalidOperationException($"Could not get {Path.GetFileName(src)} under {max / 1024} KB.");
-    }
-
-    public static void Rotate(string src, string dst, double degrees)
-    {
-        var t = new TransformedBitmap(Load(src), new RotateTransform(degrees));
-        File.WriteAllBytes(dst, Encode(t, Native.Contains(Registry.Ext(dst)) ? Registry.Ext(dst) : "png"));
-    }
-
-    /// <summary>One page per picture, each page the picture's own size (at 96 dpi), in the order selected.</summary>
-    public static void ImagesToPdf(IEnumerable<string> files, string dst, Action<double> progress, CancellationToken ct)
-    {
-        var list = files.ToList();
-        var pdf = new PdfDocumentBuilder();
-        for (int i = 0; i < list.Count; i++)
-        {
-            ct.ThrowIfCancellationRequested();
-            var b = Load(list[i]);
-            double w = b.PixelWidth * 0.75, h = b.PixelHeight * 0.75; // pixels at 96 dpi to PDF points
-            pdf.AddPage(w, h).AddJpeg(Encode(b, "jpg", 90), new UglyToad.PdfPig.Core.PdfRectangle(0, 0, w, h));
-            progress((i + 1.0) / list.Count);
-        }
-        File.WriteAllBytes(dst, pdf.Build());
     }
 
     // ---------------- video and audio (ffmpeg)

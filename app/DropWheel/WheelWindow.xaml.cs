@@ -103,7 +103,8 @@ public partial class WheelWindow : Window
             foreach (var g in ops.GroupBy(o => o.Group))
             {
                 var name = g.Key;
-                entries.Add((name, $"{g.Count()} options", _ => { _group = name; Build(); }, true));
+                if (g.Count() == 1) { var op = g.First(); entries.Add((op.Label, op.Detail, files => Choose(op, files), false)); }
+                else entries.Add((name, $"{g.Count()} options", _ => { _group = name; Build(); }, true));
             }
         else
             foreach (var o in ops)
