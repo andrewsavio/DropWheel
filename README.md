@@ -7,7 +7,7 @@
 Convert, compress, crop, merge, protect: 70+ file jobs for Windows, done where the file already is,
 with no upload, no account and no window to open.
 
-<img src="replica/clone-screens/S01.png" width="360" alt="The DropWheel glass ring: eight rounded wedges (JPG, BMP, TIFF, GIF, WEBP, AVIF, HEIC, PDF) around a centre showing the file's thumbnail, size and name">
+<img src="docs/hero.png" width="100%" alt="DropWheel: a glass ring of format wedges (PNG, BMP, TIFF, GIF, WebP, AVIF, PDF) opens around a dragged photo, its thumbnail and size in the centre. Hold Shift, drag, drop.">
 
 </div>
 

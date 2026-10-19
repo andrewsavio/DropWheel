@@ -140,7 +140,13 @@ public static class SelfTest
             Log.AppendLine("engines: " + string.Join(", ", new[] { "ffmpeg", "magick", "pandoc", "soffice", "7z", "pdftoppm", "gswin64c" }.Select(e => $"{e}={(Engines.Has(e) ? "yes" : "no")}")));
             Log.AppendLine("ops available: " + Registry.All().Count(o => o.Available) + " of " + Registry.All().Count);
 
-            if (shot != null) RenderWheel(png, shot);
+            if (shot != null)
+            {
+                // --shot-file picks the dragged file, --shot-scale renders sharper, --shot-clear leaves the background transparent (for compositing)
+                var file = args.SkipWhile(a => a != "--shot-file").Skip(1).FirstOrDefault() ?? png;
+                var scale = double.TryParse(args.SkipWhile(a => a != "--shot-scale").Skip(1).FirstOrDefault(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var sc) ? sc : 1;
+                RenderWheel(file, shot, scale, args.Contains("--shot-clear"));
+            }
         }
         catch (Exception e) { Check("self-test crashed", false, e.ToString()); }
         File.WriteAllText(logPath, Log.ToString());
@@ -609,14 +615,16 @@ public static class SelfTest
         return (px[0] + px[1] + px[2]) / 3;
     }
 
-    static void RenderWheel(string sample, string outPng)
+    static void RenderWheel(string sample, string outPng, double scale = 1, bool clear = false)
     {
         var w = new WheelWindow(Mode.Convert, new[] { sample }, keyboard: true);
+        if (clear) w.Hint.Visibility = Visibility.Collapsed; // the keyboard hint is for people, not pictures
         w.Show();
         w.UpdateLayout();
-        var rtb = new RenderTargetBitmap(420, 420, 96, 96, PixelFormats.Pbgra32);
+        int px = (int)(420 * scale);
+        var rtb = new RenderTargetBitmap(px, px, 96 * scale, 96 * scale, PixelFormats.Pbgra32);
         var bg = new DrawingVisual();
-        using (var dc = bg.RenderOpen()) dc.DrawRectangle(new LinearGradientBrush(new GradientStopCollection { new(Color.FromRgb(0xff, 0x8a, 0x3d), 0), new(Color.FromRgb(0xff, 0x6f, 0x91), 0.55), new(Color.FromRgb(0x7b, 0x6c, 0xf0), 1) }, new Point(0, 0), new Point(1, 1)), null, new Rect(0, 0, 420, 420));
+        if (!clear) using (var dc = bg.RenderOpen()) dc.DrawRectangle(new LinearGradientBrush(new GradientStopCollection { new(Color.FromRgb(0xff, 0x8a, 0x3d), 0), new(Color.FromRgb(0xff, 0x6f, 0x91), 0.55), new(Color.FromRgb(0x7b, 0x6c, 0xf0), 1) }, new Point(0, 0), new Point(1, 1)), null, new Rect(0, 0, 420, 420));
         rtb.Render(bg);
         rtb.Render(w.Root);
         var enc = new PngBitmapEncoder();
