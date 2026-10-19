@@ -106,23 +106,27 @@ public static class Registry
         foreach (var o in new[] { "jpg", "png" })
         {
             ops.Add(new Op("slide>" + o, OpKind.Convert, Up(o), "Slides", $"Every slide as {Up(o)}", In(SlideIn), "",
-                (s, d, p, ct) => SlidesToImages(s, d, o, ct), soffice && poppler, "LibreOffice + Poppler") { IsFolderOut = true, Suffix = " (slides)" });
+                (s, d, p, ct) => SlidesToImages(s, d, o, ct), soffice && (gs || poppler), "LibreOffice") { IsFolderOut = true, Suffix = " (slides)" });
         }
+        ops.Add(new Op("slide>pptx", OpKind.Convert, "PPTX", "Slides", "Convert to PowerPoint", InNot(SlideIn, "pptx"), "pptx",
+            (s, d, p, ct) => Soffice(s, d, "pptx", null, ct), soffice, "LibreOffice"));
         // ---- PDF out
         foreach (var o in new[] { "jpg", "png" })
-            ops.Add(new Op("pdf>" + o, OpKind.Convert, Up(o), "PDF", $"One {Up(o)} per page, 200 dpi", In("pdf"), "",
+            ops.Add(new Op("pdf>" + o, OpKind.Convert, Up(o), "Images", $"One {Up(o)} per page, 200 dpi", In("pdf"), "",
                 (s, d, p, ct) => gs ? PdfTools.ToImages(s, d, o, ct) : Tools.PdfToImages(s, d, o, p, ct)) { IsFolderOut = true, Suffix = " (pages)" });
-        ops.Add(new Op("pdf>txt", OpKind.Convert, "TXT", "PDF", "Text in reading order", In("pdf"), "txt", (s, d, p, ct) => PdfTools.ToText(s, d, false, ct)));
-        ops.Add(new Op("pdf>md", OpKind.Convert, "MD", "PDF", "Text as Markdown, a heading per page", In("pdf"), "md", (s, d, p, ct) => PdfTools.ToText(s, d, true, ct)));
+        ops.Add(new Op("pdf>txt", OpKind.Convert, "TXT", "Text", "Text in reading order", In("pdf"), "txt", (s, d, p, ct) => PdfTools.ToText(s, d, false, ct)));
+        ops.Add(new Op("pdf>md", OpKind.Convert, "MD", "Text", "Text as Markdown, a heading per page", In("pdf"), "md", (s, d, p, ct) => PdfTools.ToText(s, d, true, ct)));
         ops.Add(new Op("pdf>pdfa", OpKind.Convert, "PDF/A", "PDF", "Archive format (PDF/A-2b)", In("pdf"), "pdf", (s, d, p, ct) => PdfTools.ToPdfA(s, d, ct), gs, "Ghostscript") { Suffix = "-pdfa" });
-        ops.Add(new Op("pdf>images", OpKind.Convert, "Images", "PDF", "Every picture inside, unchanged", In("pdf"), "", (s, d, p, ct) => PdfTools.ExtractImages(s, d, p, ct)) { IsFolderOut = true, Suffix = " (images)" });
+        ops.Add(new Op("pdf>images", OpKind.Convert, "Pictures", "Images", "Every picture inside, unchanged", In("pdf"), "", (s, d, p, ct) => PdfTools.ExtractImages(s, d, p, ct)) { IsFolderOut = true, Suffix = " (images)" });
         ops.Add(new Op("html>pdf", OpKind.Convert, "PDF", "Web page", "Print the page to PDF", In(ImageTools.HtmlIn), "pdf", (s, d, p, ct) => PdfTools.HtmlToPdf(s, d, ct), Engines.Has("msedge"), "Microsoft Edge"));
-        ops.Add(new Op("pdf>docx", OpKind.Convert, "DOCX", "PDF", "Best effort: layout may shift", In("pdf"), "docx",
+        ops.Add(new Op("pdf>docx", OpKind.Convert, "Word", "Office", "Editable DOCX; complex layouts may shift", In("pdf"), "docx",
             (s, d, p, ct) => Soffice(s, d, "docx:MS Word 2007 XML", "writer_pdf_import", ct), soffice, "LibreOffice"));
-        ops.Add(new Op("pdf>epub", OpKind.Convert, "EPUB", "PDF", "Best effort: layout is lost", In("pdf"), "epub",
+        ops.Add(new Op("pdf>epub", OpKind.Convert, "EPUB", "Text", "Best effort: layout is lost", In("pdf"), "epub",
             (s, d, p, ct) => Soffice(s, d, "epub", "writer_pdf_import", ct), soffice, "LibreOffice"));
-        ops.Add(new Op("pdf>pptx", OpKind.Convert, "PPTX", "PDF", "Best effort: pages become slides", In("pdf"), "pptx",
+        ops.Add(new Op("pdf>pptx", OpKind.Convert, "PowerPoint", "Office", "Each page becomes a slide", In("pdf"), "pptx",
             (s, d, p, ct) => Soffice(s, d, "pptx", "impress_pdf_import", ct), soffice, "LibreOffice"));
+        ops.Add(new Op("pdf>xlsx", OpKind.Convert, "Excel", "Office", "Tables as rows and columns in XLSX", In("pdf"), "xlsx",
+            (s, d, p, ct) => PdfTools.ToXlsx(s, d, (c, x, t) => Soffice(c, x, "xlsx", "CSV:44,34,76,1", t), ct), soffice, "LibreOffice"));
         // ---- archives
         var archIn = ArchiveIn.Where(e => sevenZ || e is not ("rar" or "7z")).ToArray();
         foreach (var o in new[] { "zip", "tar", "tar.gz" })
@@ -308,7 +312,7 @@ public static class Registry
     static async Task SlidesToImages(string src, string dstDir, string o, CancellationToken ct)
     {
         var pdf = Path.Combine(Path.GetTempPath(), "dw-" + Guid.NewGuid().ToString("N") + ".pdf");
-        try { await Soffice(src, pdf, "pdf", null, ct); await PdfToImages(pdf, dstDir, o, ct); }
+        try { await Soffice(src, pdf, "pdf", null, ct); if (Engines.Has("gswin64c")) await PdfTools.ToImages(pdf, dstDir, o, ct); else await PdfToImages(pdf, dstDir, o, ct); }
         finally { try { File.Delete(pdf); } catch { } }
     }
 

@@ -15,6 +15,7 @@ $engines = @(
   @{ Name = "libjpeg-turbo"; Url = "https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.2.0/libjpeg-turbo-3.2.0-vc-x64.exe"; Sha = "662761d8ba8dae04aec74023ebaeceb856c2b56b9b59cfd180759d26300dda42"; Keep = "bin\jpegtran.exe", "bin\jpeg62.dll", "doc\LICENSE.md", "doc\README.ijg" }
   @{ Name = "qpdf";        Url = "https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2-msvc64.zip"; Sha = "db87077e683630c1217e0e8f9a20a9749d952ab676e881c3689187763a5de25d"; Keep = "bin\*", "share\doc\qpdf\manual-html\license.html" }
   @{ Name = "ghostscript"; Url = "https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10080/gs10080w64.exe"; Sha = "52a91b8bf09298788d7a57b9206127026c23eacd75405f0a131e26dc381dce50"; Keep = "bin\*", "lib", "doc\COPYING" }
+  @{ Name = "libreoffice"; Url = "https://download.documentfoundation.org/libreoffice/stable/26.8.1/win/x86_64/LibreOffice_26.8.1_Win_x86-64.msi"; Sha = "c6298b10cfa1748bcbedad94c62ce771e240e5021bfd6d7a967cd571b04b5312"; Keep = "*" }
   @{ Name = "gifsicle";    Url = "https://eternallybored.org/misc/gifsicle/releases/gifsicle-1.97-win64.zip"; Sha = "bb3ad4e1521a3953152f406eaafabda153fb5986938405860a7e7f12a3d13227"; Keep = "*" }
 )
 
@@ -33,8 +34,15 @@ foreach ($e in $engines) {
 
   $tmp = Join-Path $cache "x-$($e.Name)"
   Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
-  & $sevenZip x $file "-o$tmp" -y | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw "$($e.Name): could not unpack" }
+  if ($file.EndsWith(".msi")) {
+    # administrative image: copies the files out of the MSI without installing anything or touching the registry
+    $p = Start-Process msiexec.exe -ArgumentList "/a", "`"$file`"", "/qn", "TARGETDIR=`"$tmp`"" -Wait -PassThru
+    if ($p.ExitCode -ne 0) { throw "$($e.Name): msiexec could not unpack (exit $($p.ExitCode))" }
+    Get-ChildItem $tmp -Filter *.msi | Remove-Item -Force   # the admin image leaves a copy of the MSI behind
+  } else {
+    & $sevenZip x $file "-o$tmp" -y | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw "$($e.Name): could not unpack" }
+  }
   # archives often wrap everything in one top folder; use what is inside it
   $inner = Get-ChildItem $tmp
   if ($inner.Count -eq 1 -and $inner[0].PSIsContainer) { $tmp = $inner[0].FullName }

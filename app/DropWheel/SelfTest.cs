@@ -135,6 +135,7 @@ public static class SelfTest
             await ToolChecks(dir, png);
             await ImageChecks(dir, png);
             await PdfChecks(dir);
+            await OfficeChecks(dir);
 
             Log.AppendLine("engines: " + string.Join(", ", new[] { "ffmpeg", "magick", "pandoc", "soffice", "7z", "pdftoppm", "gswin64c" }.Select(e => $"{e}={(Engines.Has(e) ? "yes" : "no")}")));
             Log.AppendLine("ops available: " + Registry.All().Count(o => o.Available) + " of " + Registry.All().Count);
@@ -489,6 +490,61 @@ public static class SelfTest
             File.WriteAllText(html, "<!doctype html><html><body><h1>Hello PDF</h1><p>Printed by Edge.</p></body></html>");
             await T("HTML page to PDF", async () => { var o = await Run("html>pdf", html); return (Pages(o) >= 1 && PageText(o, 1).Contains("Hello PDF"), Pages(o) + " page(s)"); });
         }
+    }
+
+    static string AllText(string pdf) { using var d = PdfDocument.Open(pdf); return string.Join("\n", d.GetPages().Select(p => p.Text)); }
+
+    static async Task OfficeChecks(string dir)
+    {
+        if (!Engines.Has("soffice")) { Check("LibreOffice present (run app/fetch-engines.ps1)", false); return; }
+        async Task T(string name, Func<Task<(bool ok, string info)>> body)
+        {
+            try { var (ok, info) = await body(); Check(name, ok, info); }
+            catch (Exception e) { Check(name, false, e.Message); }
+        }
+        Check("LibreOffice comes from the bundled folder", Engines.Find("soffice")!.Contains(@"\engines\"), Engines.Find("soffice"));
+
+        // Word
+        var rtf = Path.Combine(dir, "letter.rtf");
+        File.WriteAllText(rtf, @"{\rtf1\ansi{\fonttbl{\f0 Calibri;}}\f0\fs32 Quarterly report\par\fs22 Revenue grew in every region.\par}");
+        string docx = "";
+        await T("RTF to Word (DOCX)", async () => { docx = await Run("off>docx", rtf); return (new FileInfo(docx).Length > 1000 && docx.EndsWith(".docx"), new FileInfo(docx).Length + " B"); });
+        await T("Word to PDF keeps the words", async () => { var o = await Run("off>pdf", docx); var t = AllText(o); return (t.Contains("Quarterly report") && t.Contains("Revenue grew"), t.Replace("\n", " ")); });
+
+        // Excel
+        var csv = Path.Combine(dir, "sales.csv");
+        File.WriteAllText(csv, "Item,Qty,Price\nApples,3,1.25\nPears,10,0.80\n");
+        string xlsx = "";
+        await T("CSV to Excel (XLSX)", async () => { xlsx = await Run("sheet>xlsx", csv); return (new FileInfo(xlsx).Length > 1000, new FileInfo(xlsx).Length + " B"); });
+        await T("Excel to PDF keeps the cells", async () => { var o = await Run("off>pdf", xlsx); var t = AllText(o); return (t.Contains("Apples") && t.Contains("Pears") && t.Contains("1.25"), t.Replace("\n", " ")); });
+
+        // PDF to Office, using a real 3-page text PDF
+        var b = new PdfDocumentBuilder();
+        var font = b.AddStandard14Font(UglyToad.PdfPig.Fonts.Standard14Fonts.Standard14Font.Helvetica);
+        foreach (var w in new[] { "Slide one alpha", "Slide two beta", "Slide three gamma" })
+            b.AddPage(UglyToad.PdfPig.Content.PageSize.A4).AddText(w, 20, new UglyToad.PdfPig.Core.PdfPoint(60, 760), font);
+        var src = Path.Combine(dir, "deck.pdf"); File.WriteAllBytes(src, b.Build());
+        await T("PDF to Word, and the words survive the round trip", async () => { var o = await Run("pdf>docx", src); var back = await Run("off>pdf", o); var t = AllText(back); return (t.Contains("Slide two beta"), t.Replace("\n", " ")); });
+        string pptx = "";
+        await T("PDF to PowerPoint: a slide per page", async () => { pptx = await Run("pdf>pptx", src); var back = await Run("off>pdf", pptx); return (Pages(back) == 3 && AllText(back).Contains("gamma"), Pages(back) + " slides"); });
+        await T("PowerPoint slides to PNG", async () => { var o = await Run("slide>png", pptx); var n = Directory.GetFiles(o, "*.png").Length; return (n == 3, n + " pictures"); });
+
+        // PDF to Excel: a table with three columns
+        var tb = new PdfDocumentBuilder();
+        var tf = tb.AddStandard14Font(UglyToad.PdfPig.Fonts.Standard14Fonts.Standard14Font.Helvetica);
+        var tp = tb.AddPage(UglyToad.PdfPig.Content.PageSize.A4);
+        string[][] table = { new[] { "Item", "Qty", "Price" }, new[] { "Green apples", "3", "1.25" }, new[] { "Pears", "10", "0.80" } };
+        for (int r = 0; r < table.Length; r++)
+            for (int c = 0; c < 3; c++)
+                tp.AddText(table[r][c], 12, new UglyToad.PdfPig.Core.PdfPoint(60 + c * 180, 760 - r * 22), tf);
+        var tpdf = Path.Combine(dir, "table.pdf"); File.WriteAllBytes(tpdf, tb.Build());
+        await T("PDF to Excel: rows and columns land in the right cells", async () =>
+        {
+            var o = await Run("pdf>xlsx", tpdf);
+            var back = await Run("sheet>csv", o);
+            var lines = File.ReadAllLines(back).Select(l => l.Replace("\"", "")).ToArray();
+            return (lines.Length >= 3 && lines[0] == "Item,Qty,Price" && lines[1] == "Green apples,3,1.25" && lines[2].StartsWith("Pears,10,0.8"), string.Join(" | ", lines));
+        });
     }
 
     static async Task EngineChecks(string dir, string png)

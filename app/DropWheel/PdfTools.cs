@@ -286,6 +286,66 @@ public static class PdfTools
         await File.WriteAllTextAsync(dst, sb.ToString(), ct);
     }
 
+    /// <summary>
+    /// Tables out of a PDF: words on one line become a row; their left edges, lined up across the page, become columns.
+    /// Written as CSV, then LibreOffice saves it as XLSX (so numbers become numbers). Works for text PDFs with clear
+    /// columns; ponytail: no ruled-line detection or merged cells, add a table detector if real-world statements need it.
+    /// </summary>
+    public static async Task ToXlsx(string src, string dst, Func<string, string, CancellationToken, Task> csvToXlsx, CancellationToken ct)
+    {
+        var csv = new System.Text.StringBuilder();
+        using (var doc = PdfDocument.Open(src))
+        {
+            for (int n = 1; n <= doc.NumberOfPages; n++)
+            {
+                ct.ThrowIfCancellationRequested();
+                var words = doc.GetPage(n).GetWords().Where(w => !string.IsNullOrWhiteSpace(w.Text)).ToList();
+                if (words.Count == 0) continue;
+                // rows: words whose baselines are within 3 pt
+                var rows = new List<List<UglyToad.PdfPig.Content.Word>>();
+                foreach (var w in words.OrderByDescending(w => w.BoundingBox.Bottom).ThenBy(w => w.BoundingBox.Left))
+                {
+                    var row = rows.LastOrDefault();
+                    if (row != null && Math.Abs(row[0].BoundingBox.Bottom - w.BoundingBox.Bottom) <= 3) row.Add(w); else rows.Add(new() { w });
+                }
+                // cells: within a row, a gap wider than about two letters starts a new cell
+                var cells = rows.Select(r =>
+                {
+                    var list = new List<(double left, string text)>();
+                    UglyToad.PdfPig.Content.Word? prev = null;
+                    foreach (var w in r.OrderBy(w => w.BoundingBox.Left))
+                    {
+                        double letter = w.BoundingBox.Width / Math.Max(1, w.Text.Length);
+                        if (prev != null && w.BoundingBox.Left - prev.BoundingBox.Right <= letter * 2) list[^1] = (list[^1].left, list[^1].text + " " + w.Text);
+                        else list.Add((w.BoundingBox.Left, w.Text));
+                        prev = w;
+                    }
+                    return list;
+                }).ToList();
+                // columns: left edges within 12 pt of each other share a column
+                var cols = new List<double>();
+                foreach (var x in cells.SelectMany(c => c).Select(c => c.left).OrderBy(x => x))
+                    if (cols.Count == 0 || x - cols[^1] > 12) cols.Add(x);
+                if (n > 1) csv.AppendLine();
+                foreach (var row in cells)
+                {
+                    var line = new string[cols.Count];
+                    foreach (var (left, text) in row)
+                    {
+                        int c = cols.FindLastIndex(x => x <= left + 12);
+                        c = Math.Max(0, c);
+                        line[c] = line[c] == null ? text : line[c] + " " + text;
+                    }
+                    csv.AppendLine(string.Join(",", line.Select(v => v == null ? "" : "\"" + v.Replace("\"", "\"\"") + "\"")));
+                }
+            }
+        }
+        if (csv.Length == 0) throw new InvalidOperationException("This PDF has no text to put in a spreadsheet. Scanned pages need OCR first.");
+        var tmp = Tmp(".csv");
+        try { await File.WriteAllTextAsync(tmp, csv.ToString(), new System.Text.UTF8Encoding(false), ct); await csvToXlsx(tmp, dst, ct); }
+        finally { try { File.Delete(tmp); } catch { } }
+    }
+
     /// <summary>Microsoft Edge prints the page to PDF, as its own print dialog would, without the date and URL header.</summary>
     public static async Task HtmlToPdf(string src, string dst, CancellationToken ct)
     {
